@@ -136,8 +136,6 @@ function showConnStatus(ok){
   el.style.color=ok?"#86efac":"#fca5a5";
 }
 
-var FB_URL = "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app";
-
 // Carica tutto il DB da Firebase via REST e aggiorna ogni 30 secondi
 function fbInit(){
   fbLoad();
@@ -145,39 +143,38 @@ function fbInit(){
 }
 
 function fbLoad(){
-  // Usa JSONP per aggirare CORS su GitHub Pages
-  var cb="fbcb"+Date.now();
-  window[cb]=function(data){
-    delete window[cb];
-    var s=document.getElementById("jsonp-script");
-    if(s) s.parentNode.removeChild(s);
-    if(!data) data={};
-    DB.pro=data.pro||{};
-    DB.ris=data.ris||{};
-    DB.lock=data.lock||{};
-    DB.partite39=data.partite39||[];
-    if(data.codes){
-      for(var k in data.codes) CODES[k]=data.codes[k];
-    }
-    FB_READY=true;
-    showConnStatus(true);
-    var activeTab=document.querySelector(".tab.active");
-    if(activeTab){
-      var id=activeTab.id.replace("tab-","");
-      if(id==="class") renderClassifica();
-      if(id==="tutti") renderTutti();
-      if(id==="miei"&&loggedUser) loadPronoForm();
+  var xhr=new XMLHttpRequest();
+  xhr.open("GET", FB_URL+"/.json", true);
+  xhr.onload=function(){
+    try{
+      var data=JSON.parse(xhr.responseText)||{};
+      DB.pro=data.pro||{};
+      DB.ris=data.ris||{};
+      DB.lock=data.lock||{};
+      DB.partite39=data.partite39||[];
+      if(data.codes){
+        for(var k in data.codes) CODES[k]=data.codes[k];
+      }
+      FB_READY=true;
+      showConnStatus(true);
+      var activeTab=document.querySelector(".tab.active");
+      if(activeTab){
+        var id=activeTab.id.replace("tab-","");
+        if(id==="class") renderClassifica();
+        if(id==="tutti") renderTutti();
+        if(id==="miei"&&loggedUser) loadPronoForm();
+      }
+    }catch(e){
+      var d=document.getElementById("diag");
+      if(d){d.style.display="block";d.textContent="PARSE ERR: "+e.message;}
     }
   };
-  var s=document.createElement("script");
-  s.id="jsonp-script";
-  s.src=FB_URL+"/.json?callback="+cb;
-  s.onerror=function(){
+  xhr.onerror=function(){
     showConnStatus(false);
-    var el=document.getElementById("conn-status");
-    if(el) el.textContent="🔴 Offline";
+    var d=document.getElementById("diag");
+    if(d){d.style.display="block";d.textContent="XHR ERR: "+xhr.status+" "+xhr.statusText;}
   };
-  document.head.appendChild(s);
+  xhr.send();
 }
 
 // Funzioni di scrittura su Firebase via REST
@@ -802,6 +799,7 @@ function adminSalvaPartite39(){
   <div style="font-size:30px">🏆</div>
   <h1>Torneo Pronostici</h1>
   <p>Serie A 2025/26 — Giornata <span id="hG">29</span> &nbsp;<span id="conn-status" style="font-size:10px">⏳ Connessione...</span></p>
+  <div id="diag" style="font-size:9px;color:#fca5a5;margin-top:4px;display:none"></div>
 </div>
 
 <div class="tabs">
@@ -985,11 +983,21 @@ function adminSalvaPartite39(){
 </div>
 
 <script>
-fillG();
-renderClassifica();
-loadRisForm();
-renderCal();
-fbInit();
+window.onerror=function(msg,src,line){
+  var d=document.getElementById("diag");
+  if(d){d.style.display="block";d.textContent="JS ERR: "+msg+" (L"+line+")";}
+  return false;
+};
+try{
+  fillG();
+  renderClassifica();
+  loadRisForm();
+  renderCal();
+  fbInit();
+}catch(e){
+  var d=document.getElementById("diag");
+  if(d){d.style.display="block";d.textContent="INIT ERR: "+e.message;}
+}
 </script>
 </body>
 </html>

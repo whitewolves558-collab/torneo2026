@@ -169,6 +169,8 @@ function fbInit(){
     }
   }, function(err){
     showConnStatus(false);
+    var el=document.getElementById("conn-status");
+    if(el) el.textContent="❌ "+err.code+": "+err.message;
   });
 }
 

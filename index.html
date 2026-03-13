@@ -4,9 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Torneo Pronostici 2025/26</title>
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:100vh;padding-bottom:70px}
@@ -123,18 +120,8 @@ var GB = ["Indrid","Luca","Emiliano","Moka","Chievo","Carlo","Silvio","Tommy","G
 var ALL = GA.concat(GB);
 var CODES = {"Tizy":"tizy01","Ugo":"ugo02","Beppino":"bep03","Franco":"fra04","Mirco":"mir05","Roberto":"rob06","Arnaldo":"arn07","Tomaso":"tom08","Paolo D":"paod09","Christian":"chr10","Gigi":"gig11","Genga":"gen12","Andrea F":"andf13","Eni":"eni14","Indrid":"ind01","Luca":"luc02","Emiliano":"emi03","Moka":"mok04","Chievo":"chi05","Carlo":"car06","Silvio":"sil07","Tommy":"tom08b","Gabriele":"gab09","Matteo":"mat10","Paolo E":"paoe11","Nikki":"nik12","Pipa":"pip13","Flavio":"fla14"};
 
-// ---- FIREBASE CONFIG ----
-var firebaseConfig = {
-  apiKey: "AIzaSyDh8RoS2yUqcl8GNHWXLNGWeWTkXv3ydQs",
-  authDomain: "campionato-prono2026.firebaseapp.com",
-  databaseURL: "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "campionato-prono2026",
-  storageBucket: "campionato-prono2026.firebasestorage.app",
-  messagingSenderId: "399884867305",
-  appId: "1:399884867305:web:283aa13d5e603b9af20278"
-};
-firebase.initializeApp(firebaseConfig);
-var fbDB = firebase.database();
+// ---- FIREBASE REST URL ----
+var FB_URL = "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app";
 
 // DB locale (cache sincronizzata con Firebase)
 var DB = {pro:{}, ris:{}, lock:{}, partite39:[]};
@@ -149,54 +136,103 @@ function showConnStatus(ok){
   el.style.color=ok?"#86efac":"#fca5a5";
 }
 
-// Carica tutto il DB da Firebase e avvia listener in tempo reale
+var FB_URL = "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app";
+
+// Carica tutto il DB da Firebase via REST e aggiorna ogni 30 secondi
 function fbInit(){
-  fbDB.ref("/").on("value", function(snap){
-    var data=snap.val()||{};
-    DB.pro=data.pro||{};
-    DB.ris=data.ris||{};
-    DB.lock=data.lock||{};
-    DB.partite39=data.partite39||[];
-    FB_READY=true;
-    showConnStatus(true);
-    // Aggiorna UI se visibile
-    var activeTab=document.querySelector(".tab.active");
-    if(activeTab){
-      var id=activeTab.id.replace("tab-","");
-      if(id==="class") renderClassifica();
-      if(id==="tutti") renderTutti();
-      if(id==="miei"&&loggedUser) loadPronoForm();
-    }
-  }, function(err){
-    showConnStatus(false);
-    var el=document.getElementById("conn-status");
-    if(el) el.textContent="❌ "+err.code+": "+err.message;
-  });
+  fbLoad();
+  setInterval(fbLoad, 30000);
 }
 
-// Funzioni di scrittura su Firebase
+function fbLoad(){
+  fetch(FB_URL+"/.json")
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!data) data={};
+      DB.pro=data.pro||{};
+      DB.ris=data.ris||{};
+      DB.lock=data.lock||{};
+      DB.partite39=data.partite39||[];
+      // Carica codici da Firebase se presenti, altrimenti usa hardcoded
+      if(data.codes){
+        for(var k in data.codes) CODES[k]=data.codes[k];
+      }
+      FB_READY=true;
+      showConnStatus(true);
+      var activeTab=document.querySelector(".tab.active");
+      if(activeTab){
+        var id=activeTab.id.replace("tab-","");
+        if(id==="class") renderClassifica();
+        if(id==="tutti") renderTutti();
+        if(id==="miei"&&loggedUser) loadPronoForm();
+      }
+    })
+    .catch(function(err){
+      showConnStatus(false);
+      var el=document.getElementById("conn-status");
+      if(el) el.textContent="❌ "+err.message;
+    });
+}
+
+// Funzioni di scrittura su Firebase via REST
 function fbSavePro(g, player, pronos, locked){
-  var updates={};
-  updates["/pro/"+g+"/"+player.replace(/ /g,"_")]=pronos;
-  updates["/lock/"+g+"/"+player.replace(/ /g,"_")]=locked;
-  fbDB.ref().update(updates);
+  var key=player.replace(/ /g,"_");
+  fetch(FB_URL+"/pro/"+g+"/"+key+".json",{method:"PUT",body:JSON.stringify(pronos)});
+  fetch(FB_URL+"/lock/"+g+"/"+key+".json",{method:"PUT",body:JSON.stringify(locked)});
 }
 
 function fbSaveRis(g, data){
-  fbDB.ref("/ris/"+g).set(data);
+  fetch(FB_URL+"/ris/"+g+".json",{method:"PUT",body:JSON.stringify(data)});
 }
 
 function fbSaveLock(g, player, val){
-  fbDB.ref("/lock/"+g+"/"+player.replace(/ /g,"_")).set(val);
+  var key=player.replace(/ /g,"_");
+  fetch(FB_URL+"/lock/"+g+"/"+key+".json",{method:"PUT",body:JSON.stringify(val)});
 }
 
 function fbDelPro(g, player){
-  fbDB.ref("/pro/"+g+"/"+player.replace(/ /g,"_")).remove();
-  fbDB.ref("/lock/"+g+"/"+player.replace(/ /g,"_")).remove();
+  var key=player.replace(/ /g,"_");
+  fetch(FB_URL+"/pro/"+g+"/"+key+".json",{method:"DELETE"});
+  fetch(FB_URL+"/lock/"+g+"/"+key+".json",{method:"DELETE"});
 }
 
 function fbSavePartite39(partite){
-  fbDB.ref("/partite39").set(partite);
+  fetch(FB_URL+"/partite39.json",{method:"PUT",body:JSON.stringify(partite)});
+}
+
+function fbSaveCode(player, newCode){
+  var key=player.replace(/ /g,"_");
+  return fetch(FB_URL+"/codes/"+key+".json",{method:"PUT",body:JSON.stringify(newCode)});
+}
+
+function cambiaCodice(){
+  if(!loggedUser) return;
+  var attuale=document.getElementById("inp-pwd-attuale").value.trim();
+  var nuovo=document.getElementById("inp-pwd-nuovo").value.trim();
+  var conferma=document.getElementById("inp-pwd-conferma").value.trim();
+  if(!attuale||!nuovo||!conferma){sal("al-pwd","Compila tutti i campi.","aerr");return;}
+  if(CODES[loggedUser]!==attuale){sal("al-pwd","Codice attuale errato.","aerr");return;}
+  if(nuovo.length<4){sal("al-pwd","Il nuovo codice deve avere almeno 4 caratteri.","aerr");return;}
+  if(nuovo!==conferma){sal("al-pwd","I due nuovi codici non coincidono.","aerr");return;}
+  fbSaveCode(loggedUser, nuovo).then(function(){
+    CODES[loggedUser]=nuovo;
+    sal("al-pwd","Codice cambiato con successo!","aok");
+    document.getElementById("inp-pwd-attuale").value="";
+    document.getElementById("inp-pwd-nuovo").value="";
+    document.getElementById("inp-pwd-conferma").value="";
+  }).catch(function(){sal("al-pwd","Errore nel salvataggio.","aerr");});
+}
+
+function adminResetCodice(){
+  var p=document.getElementById("sel-resetp").value;
+  var nuovo=document.getElementById("inp-reset-code").value.trim();
+  if(!nuovo||nuovo.length<4){sal("al-reset","Inserisci un codice di almeno 4 caratteri.","aerr");return;}
+  fbSaveCode(p, nuovo).then(function(){
+    CODES[p]=nuovo;
+    sal("al-reset","Codice di "+p+" resettato a: "+nuovo,"aok");
+    document.getElementById("inp-reset-code").value="";
+    renderCodici();
+  }).catch(function(){sal("al-reset","Errore nel salvataggio.","aerr");});
 }
 
 // Wrapper per leggere pro/lock con chiave sanitizzata
@@ -820,6 +856,17 @@ function adminSalvaPartite39(){
       <button class="btn btn-gold" id="btn-salva" onclick="salvaProno()" style="display:none">💾 Salva e Blocca</button>
       <button class="btn btn-gray" onclick="doLogout()">Esci</button>
     </div>
+    <div class="card">
+      <h2>🔑 Cambia Codice</h2>
+      <span class="flabel">Codice attuale</span>
+      <input type="text" id="inp-pwd-attuale" placeholder="Codice attuale"/>
+      <span class="flabel">Nuovo codice</span>
+      <input type="text" id="inp-pwd-nuovo" placeholder="Nuovo codice (min. 4 caratteri)"/>
+      <span class="flabel">Conferma nuovo codice</span>
+      <input type="text" id="inp-pwd-conferma" placeholder="Ripeti nuovo codice"/>
+      <div id="al-pwd"></div>
+      <button class="btn btn-blue" onclick="cambiaCodice()">🔑 Cambia Codice</button>
+    </div>
   </div>
 </div>
 
@@ -900,6 +947,28 @@ function adminSalvaPartite39(){
       <select id="sel-delg"></select>
       <button class="btn btn-red" onclick="adminDel()">🗑️ Elimina</button>
       <div id="al-del"></div>
+      <div class="ssect">🔑 Reset codice giocatore</div>
+      <span class="flabel">Giocatore</span>
+      <select id="sel-resetp">
+        <optgroup label="Girone A">
+          <option>Tizy</option><option>Ugo</option><option>Beppino</option>
+          <option>Franco</option><option>Mirco</option><option>Roberto</option>
+          <option>Arnaldo</option><option>Tomaso</option><option>Paolo D</option>
+          <option>Christian</option><option>Gigi</option><option>Genga</option>
+          <option>Andrea F</option><option>Eni</option>
+        </optgroup>
+        <optgroup label="Girone B">
+          <option>Indrid</option><option>Luca</option><option>Emiliano</option>
+          <option>Moka</option><option>Chievo</option><option>Carlo</option>
+          <option>Silvio</option><option>Tommy</option><option>Gabriele</option>
+          <option>Matteo</option><option>Paolo E</option><option>Nikki</option>
+          <option>Pipa</option><option>Flavio</option>
+        </optgroup>
+      </select>
+      <span class="flabel">Nuovo codice</span>
+      <input type="text" id="inp-reset-code" placeholder="Nuovo codice (min. 4 caratteri)"/>
+      <button class="btn btn-blue" onclick="adminResetCodice()">🔑 Resetta Codice</button>
+      <div id="al-reset"></div>
       <div class="ssect">⚽ Partite Giornata 39</div>
       <div id="box-p39"></div>
       <div class="ssect">🔑 Codici personali</div>

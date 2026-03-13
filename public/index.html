@@ -157,6 +157,8 @@ function fbLoad(){
       }
       FB_READY=true;
       showConnStatus(true);
+      // Auto-login se credenziali salvate
+      if(!loggedUser) tryAutoLogin();
       var activeTab=document.querySelector(".tab.active");
       if(activeTab){
         var id=activeTab.id.replace("tab-","");
@@ -519,6 +521,8 @@ function doLogin(){
   if(!nome){sal("al-login","Seleziona il tuo nome.","aerr");return;}
   if(CODES[nome]!==code){sal("al-login","Codice errato.","aerr");return;}
   loggedUser=nome;
+  // Salva login sul dispositivo
+  try{localStorage.setItem("tp_user",nome);localStorage.setItem("tp_code",code);}catch(e){}
   sal("al-login","","");
   document.getElementById("box-login").style.display="none";
   document.getElementById("box-prono").style.display="block";
@@ -529,10 +533,26 @@ function doLogin(){
 
 function doLogout(){
   loggedUser=null;
+  // Cancella login salvato
+  try{localStorage.removeItem("tp_user");localStorage.removeItem("tp_code");}catch(e){}
   document.getElementById("box-login").style.display="block";
   document.getElementById("box-prono").style.display="none";
   document.getElementById("inp-code").value="";
   document.getElementById("sel-nome").value="";
+}
+
+function tryAutoLogin(){
+  try{
+    var nome=localStorage.getItem("tp_user");
+    var code=localStorage.getItem("tp_code");
+    if(!nome||!code) return;
+    // Aspetta che Firebase abbia caricato i codici aggiornati
+    if(CODES[nome]&&CODES[nome]===code){
+      document.getElementById("sel-nome").value=nome;
+      document.getElementById("inp-code").value=code;
+      doLogin();
+    }
+  }catch(e){}
 }
 
 function loadPronoForm(){
@@ -651,7 +671,6 @@ function loadRisForm(){
       html+='<input type="number" min="0" id="rg'+i+'t" value="'+(sr.gT||"")+'" placeholder="-"/>';
       html+='</div></div></div>';
     }
-    html+='<button class="btn btn-blue" onclick="salvaRis()">💾 Salva Risultati</button>';
   } else {
     html+='<p style="font-size:12px;color:#64748b;margin-bottom:10px">G'+g+': inserisci squadre e risultati manualmente.</p>';
     for(var i=0;i<10;i++){
@@ -666,7 +685,6 @@ function loadRisForm(){
       html+='<input type="number" min="0" id="rg'+i+'t" value="'+(r.gT||"")+'" placeholder="-"/>';
       html+='</div></div>';
     }
-    html+='<button class="btn btn-blue" onclick="salvaRisLibero()">💾 Salva Risultati</button>';
   }
   document.getElementById("rows-ris").innerHTML=html;
 }
@@ -915,6 +933,14 @@ function adminSalvaPartite39(){
   <div id="box-ap" style="display:none">
     <div class="card">
       <h2>🔧 Pannello Admin</h2>
+      <div class="ssect">📋 Risultati reali</div>
+      <div class="gbar">
+        <span class="flabel">GIORNATA</span>
+        <select id="sel-rg" onchange="loadRisForm()"></select>
+      </div>
+      <div id="rows-ris"></div>
+      <div id="al-ris"></div>
+      <button class="btn btn-gold" onclick="salvaRis()">💾 Salva Risultati</button>
       <div class="ssect">🔓 Sblocca pronostici</div>
       <span class="flabel">Giocatore</span>
       <select id="sel-ulkp">

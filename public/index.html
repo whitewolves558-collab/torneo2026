@@ -988,16 +988,18 @@ window.onerror=function(msg,src,line){
   if(d){d.style.display="block";d.textContent="JS ERR: "+msg+" (L"+line+")";}
   return false;
 };
-try{
-  fillG();
-  renderClassifica();
-  loadRisForm();
-  renderCal();
-  fbInit();
-}catch(e){
-  var d=document.getElementById("diag");
-  if(d){d.style.display="block";d.textContent="INIT ERR: "+e.message;}
-}
+window.onload=function(){
+  try{
+    fillG();
+    renderClassifica();
+    loadRisForm();
+    renderCal();
+    fbInit();
+  }catch(e){
+    var d=document.getElementById("diag");
+    if(d){d.style.display="block";d.textContent="INIT ERR: "+e.message;}
+  }
+};
 </script>
 </body>
 </html>

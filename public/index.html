@@ -454,6 +454,7 @@ function showPage(id){
   if(id==="class") renderClassifica();
   if(id==="tutti") renderTutti();
   if(id==="cal") renderCal();
+  if(id==="admin") loadRisForm();
 }
 
 function fillG(){
@@ -992,7 +993,6 @@ window.onload=function(){
   try{
     fillG();
     renderClassifica();
-    loadRisForm();
     renderCal();
     fbInit();
   }catch(e){

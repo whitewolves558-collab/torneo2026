@@ -145,11 +145,8 @@ function fbInit(){
 }
 
 function fbLoad(){
-  fetch(FB_URL+"/.json?print=pretty", {mode:"cors"})
-    .then(function(r){
-      if(!r.ok) throw new Error("HTTP "+r.status);
-      return r.json();
-    })
+  fetch(FB_URL+"/.json")
+    .then(function(r){return r.json();})
     .then(function(data){
       if(!data) data={};
       DB.pro=data.pro||{};
@@ -314,4 +311,5 @@ var CAL_A = {
 };
 var CAL_B = {
   1:[["Emiliano","Flavio"],["Pipa","Paolo E"],["Matteo","Carlo"],["Chievo","Luca"],["Indrid","Silvio"],["Nikki","Gabriele"],["Tommy","Moka"]],
-  2:[["Moka","Emiliano"],["Gabriele","Tommy"],["Silvio","Nikki"],["Luca","Indrid"],["Carlo","Chievo"],["Paolo E","Matteo"],["Flavio","Pipa"
+  2:[["Moka","Emiliano"],["Gabriele","Tommy"],["Silvio","Nikki"],["Luca","Indrid"],["Carlo","Chievo"],["Paolo E","Matteo"],["Flavio","Pipa"]],
+  3:[["Emiliano","Indrid"],["Nikki","Chievo"],["Tommy","Matteo"],["Moka","Pipa"],["Gabr

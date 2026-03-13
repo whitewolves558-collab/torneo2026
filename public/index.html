@@ -136,6 +136,8 @@ function showConnStatus(ok){
   el.style.color=ok?"#86efac":"#fca5a5";
 }
 
+var FB_URL = "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app";
+
 // Carica tutto il DB da Firebase via REST e aggiorna ogni 30 secondi
 function fbInit(){
   fbLoad();
@@ -143,32 +145,39 @@ function fbInit(){
 }
 
 function fbLoad(){
-  fetch(FB_URL+"/.json")
-    .then(function(r){return r.json();})
-    .then(function(data){
-      if(!data) data={};
-      DB.pro=data.pro||{};
-      DB.ris=data.ris||{};
-      DB.lock=data.lock||{};
-      DB.partite39=data.partite39||[];
-      if(data.codes){
-        for(var k in data.codes) CODES[k]=data.codes[k];
-      }
-      FB_READY=true;
-      showConnStatus(true);
-      var activeTab=document.querySelector(".tab.active");
-      if(activeTab){
-        var id=activeTab.id.replace("tab-","");
-        if(id==="class") renderClassifica();
-        if(id==="tutti") renderTutti();
-        if(id==="miei"&&loggedUser) loadPronoForm();
-      }
-    })
-    .catch(function(err){
-      showConnStatus(false);
-      var el=document.getElementById("conn-status");
-      if(el) el.textContent="🔴 Errore: "+err.message;
-    });
+  // Usa JSONP per aggirare CORS su GitHub Pages
+  var cb="fbcb"+Date.now();
+  window[cb]=function(data){
+    delete window[cb];
+    var s=document.getElementById("jsonp-script");
+    if(s) s.parentNode.removeChild(s);
+    if(!data) data={};
+    DB.pro=data.pro||{};
+    DB.ris=data.ris||{};
+    DB.lock=data.lock||{};
+    DB.partite39=data.partite39||[];
+    if(data.codes){
+      for(var k in data.codes) CODES[k]=data.codes[k];
+    }
+    FB_READY=true;
+    showConnStatus(true);
+    var activeTab=document.querySelector(".tab.active");
+    if(activeTab){
+      var id=activeTab.id.replace("tab-","");
+      if(id==="class") renderClassifica();
+      if(id==="tutti") renderTutti();
+      if(id==="miei"&&loggedUser) loadPronoForm();
+    }
+  };
+  var s=document.createElement("script");
+  s.id="jsonp-script";
+  s.src=FB_URL+"/.json?callback="+cb;
+  s.onerror=function(){
+    showConnStatus(false);
+    var el=document.getElementById("conn-status");
+    if(el) el.textContent="🔴 Offline";
+  };
+  document.head.appendChild(s);
 }
 
 // Funzioni di scrittura su Firebase via REST
@@ -308,6 +317,4 @@ var CAL_A = {
 };
 var CAL_B = {
   1:[["Emiliano","Flavio"],["Pipa","Paolo E"],["Matteo","Carlo"],["Chievo","Luca"],["Indrid","Silvio"],["Nikki","Gabriele"],["Tommy","Moka"]],
-  2:[["Moka","Emiliano"],["Gabriele","Tommy"],["Silvio","Nikki"],["Luca","Indrid"],["Carlo","Chievo"],["Paolo E","Matteo"],["Flavio","Pipa"]],
-  3:[["Emiliano","Indrid"],["Nikki","Chievo"],["Tommy","Matteo"],["Moka","Pipa"],["Gabriele","Flavio"],["Silvio","Paolo E"],["Luca","Carlo"]],
-  4:[["Carlo","Emiliano"],["Paolo E","Luca"],["Flavio","Silvio"],["Pipa","Gabriele"],["Matteo","Moka"
+  2:[["Moka","Emiliano"],["Gabriele","Tommy"],["Silvio","Nikki"],["Luca","Indrid"],["Carlo",

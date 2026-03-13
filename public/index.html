@@ -262,7 +262,7 @@ var BASE = {
   "Tizy":     {pt:52,re:30,v:16,par:1,s:9, gf:185,gs:177,bon:3},
   "Eni":      {pt:49,re:25,v:13,par:4,s:9, gf:181,gs:174,bon:6},
   "Genga":    {pt:47,re:32,v:11,par:4,s:11,gf:202,gs:203,bon:6},
-  "Ugo":      {pt:46,re:47,v:13,par:3,s:10,gf:185,gs:181,bon:4},
+  "Ugo":      {pt:46,re:27,v:13,par:3,s:10,gf:185,gs:181,bon:4},
   "Arnaldo":  {pt:41,re:31,v:11,par:4,s:11,gf:185,gs:196,bon:4},
   "Christian":{pt:40,re:26,v:12,par:1,s:13,gf:178,gs:171,bon:3},
   "Gigi":     {pt:38,re:23,v:10,par:5,s:11,gf:173,gs:181,bon:3},
@@ -721,19 +721,46 @@ function renderCal(){
   var cg=getCalGiornata(g);
   if(!cg){document.getElementById("body-cal").innerHTML='<div class="alert ainfo">Nessun dato.</div>';return;}
   var tipo=isRitornoG(g)?" (Ritorno)":g>=27?" (Andata bis)":" (Andata)";
+  var ris=getRisForG(g);
+  var hasR=ris.some(function(r){return r&&r.gC!=="";});
+
   function renderMatches(matches,titolo,cls){
     var h='<div style="font-size:11px;font-weight:700;color:'+cls+';letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">'+titolo+'</div>';
     for(var i=0;i<matches.length;i++){
       var m=matches[i];
-      h+='<div class="cal-row">';
-      h+='<span class="cal-team cal-home">'+m[0]+'</span>';
+      var p1=m[0],p2=m[1];
+      var r1=hasR?calcPtProno(p1,g):null;
+      var r2=hasR?calcPtProno(p2,g):null;
+      var pt1=r1?r1.tot:null;
+      var pt2=r2?r2.tot:null;
+      var ex1=r1?r1.ex:0;
+      var ex2=r2?r2.ex:0;
+      var win1=pt1!==null&&pt2!==null&&pt1>pt2;
+      var win2=pt1!==null&&pt2!==null&&pt2>pt1;
+      var draw=pt1!==null&&pt2!==null&&pt1===pt2;
+
+      var bg1=win1?"rgba(245,197,24,0.15)":draw?"rgba(59,130,246,0.1)":"";
+      var bg2=win2?"rgba(245,197,24,0.15)":draw?"rgba(59,130,246,0.1)":"";
+      var col1=win1?"#f5c518":draw?"#93c5fd":"#fff";
+      var col2=win2?"#f5c518":draw?"#93c5fd":"#fff";
+      var ico1=win1?"🏆 ":draw?"🤝 ":"";
+      var ico2=win2?"🏆 ":draw?"🤝 ":"";
+
+      h+='<div class="cal-row" style="align-items:stretch">';
+      h+='<div style="flex:1;background:'+bg1+';border-radius:8px;padding:7px 9px;border-left:3px solid #f5c518">';
+      h+='<div style="font-size:12px;font-weight:800;color:'+col1+'">'+ico1+p1+'</div>';
+      if(pt1!==null) h+='<div style="font-size:11px;color:#f5c518;font-weight:700;margin-top:2px">'+pt1+'pt <span style="color:#86efac;font-size:10px">('+ex1+'RE)</span></div>';
+      h+='</div>';
       h+='<span class="cal-vs">VS</span>';
-      h+='<span class="cal-team cal-away">'+m[1]+'</span>';
+      h+='<div style="flex:1;background:'+bg2+';border-radius:8px;padding:7px 9px;border-left:3px solid #60a5fa">';
+      h+='<div style="font-size:12px;font-weight:800;color:'+col2+'">'+ico2+p2+'</div>';
+      if(pt2!==null) h+='<div style="font-size:11px;color:#f5c518;font-weight:700;margin-top:2px">'+pt2+'pt <span style="color:#86efac;font-size:10px">('+ex2+'RE)</span></div>';
+      h+='</div>';
       h+='</div>';
     }
     return h;
   }
-  var html='<p style="font-size:11px;color:#64748b;margin-bottom:12px">Giornata '+g+tipo+'</p>';
+  var html='<p style="font-size:11px;color:#64748b;margin-bottom:12px">Giornata '+g+tipo+(hasR?' — risultati disponibili':'')+'</p>';
   html+=renderMatches(cal.a,"⚽ Girone A","#93c5fd");
   html+='<div style="margin:14px 0 10px;border-top:1px solid rgba(255,255,255,0.06)"></div>';
   html+=renderMatches(cal.b,"⚽ Girone B","#d8b4fe");

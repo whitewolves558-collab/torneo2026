@@ -4,9 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Torneo Pronostici 2025/26</title>
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:100vh;padding-bottom:70px}
@@ -123,18 +120,8 @@ var GB = ["Indrid","Luca","Emiliano","Moka","Chievo","Carlo","Silvio","Tommy","G
 var ALL = GA.concat(GB);
 var CODES = {"Tizy":"tizy01","Ugo":"ugo02","Beppino":"bep03","Franco":"fra04","Mirco":"mir05","Roberto":"rob06","Arnaldo":"arn07","Tomaso":"tom08","Paolo D":"paod09","Christian":"chr10","Gigi":"gig11","Genga":"gen12","Andrea F":"andf13","Eni":"eni14","Indrid":"ind01","Luca":"luc02","Emiliano":"emi03","Moka":"mok04","Chievo":"chi05","Carlo":"car06","Silvio":"sil07","Tommy":"tom08b","Gabriele":"gab09","Matteo":"mat10","Paolo E":"paoe11","Nikki":"nik12","Pipa":"pip13","Flavio":"fla14"};
 
-// ---- FIREBASE CONFIG ----
-var firebaseConfig = {
-  apiKey: "AIzaSyDh8RoS2yUqcl8GNHWXLNGWeWTkXv3ydQs",
-  authDomain: "campionato-prono2026.firebaseapp.com",
-  databaseURL: "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "campionato-prono2026",
-  storageBucket: "campionato-prono2026.firebasestorage.app",
-  messagingSenderId: "399884867305",
-  appId: "1:399884867305:web:283aa13d5e603b9af20278"
-};
-firebase.initializeApp(firebaseConfig);
-var fbDB = firebase.database();
+// ---- FIREBASE REST URL ----
+var FB_URL = "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app";
 
 // DB locale (cache sincronizzata con Firebase)
 var DB = {pro:{}, ris:{}, lock:{}, partite39:[]};
@@ -149,17 +136,31 @@ function showConnStatus(ok){
   el.style.color=ok?"#86efac":"#fca5a5";
 }
 
-// Carica tutto il DB da Firebase e avvia listener in tempo reale
+var FB_URL = "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app";
+
+// Carica tutto il DB da Firebase via REST e aggiorna ogni 30 secondi
 function fbInit(){
-  fbDB.ref("/").on("value", function(snap){
-    var data=snap.val()||{};
+  fbLoad();
+  setInterval(fbLoad, 30000);
+}
+
+function fbLoad(){
+  // Usa JSONP per aggirare CORS su GitHub Pages
+  var cb="fbcb"+Date.now();
+  window[cb]=function(data){
+    delete window[cb];
+    var s=document.getElementById("jsonp-script");
+    if(s) s.parentNode.removeChild(s);
+    if(!data) data={};
     DB.pro=data.pro||{};
     DB.ris=data.ris||{};
     DB.lock=data.lock||{};
     DB.partite39=data.partite39||[];
+    if(data.codes){
+      for(var k in data.codes) CODES[k]=data.codes[k];
+    }
     FB_READY=true;
     showConnStatus(true);
-    // Aggiorna UI se visibile
     var activeTab=document.querySelector(".tab.active");
     if(activeTab){
       var id=activeTab.id.replace("tab-","");
@@ -167,36 +168,77 @@ function fbInit(){
       if(id==="tutti") renderTutti();
       if(id==="miei"&&loggedUser) loadPronoForm();
     }
-  }, function(err){
+  };
+  var s=document.createElement("script");
+  s.id="jsonp-script";
+  s.src=FB_URL+"/.json?callback="+cb;
+  s.onerror=function(){
     showConnStatus(false);
     var el=document.getElementById("conn-status");
-    if(el) el.textContent="❌ "+err.code+": "+err.message;
-  });
+    if(el) el.textContent="🔴 Offline";
+  };
+  document.head.appendChild(s);
 }
 
-// Funzioni di scrittura su Firebase
+// Funzioni di scrittura su Firebase via REST
 function fbSavePro(g, player, pronos, locked){
-  var updates={};
-  updates["/pro/"+g+"/"+player.replace(/ /g,"_")]=pronos;
-  updates["/lock/"+g+"/"+player.replace(/ /g,"_")]=locked;
-  fbDB.ref().update(updates);
+  var key=player.replace(/ /g,"_");
+  fetch(FB_URL+"/pro/"+g+"/"+key+".json",{method:"PUT",body:JSON.stringify(pronos)});
+  fetch(FB_URL+"/lock/"+g+"/"+key+".json",{method:"PUT",body:JSON.stringify(locked)});
 }
 
 function fbSaveRis(g, data){
-  fbDB.ref("/ris/"+g).set(data);
+  fetch(FB_URL+"/ris/"+g+".json",{method:"PUT",body:JSON.stringify(data)});
 }
 
 function fbSaveLock(g, player, val){
-  fbDB.ref("/lock/"+g+"/"+player.replace(/ /g,"_")).set(val);
+  var key=player.replace(/ /g,"_");
+  fetch(FB_URL+"/lock/"+g+"/"+key+".json",{method:"PUT",body:JSON.stringify(val)});
 }
 
 function fbDelPro(g, player){
-  fbDB.ref("/pro/"+g+"/"+player.replace(/ /g,"_")).remove();
-  fbDB.ref("/lock/"+g+"/"+player.replace(/ /g,"_")).remove();
+  var key=player.replace(/ /g,"_");
+  fetch(FB_URL+"/pro/"+g+"/"+key+".json",{method:"DELETE"});
+  fetch(FB_URL+"/lock/"+g+"/"+key+".json",{method:"DELETE"});
 }
 
 function fbSavePartite39(partite){
-  fbDB.ref("/partite39").set(partite);
+  fetch(FB_URL+"/partite39.json",{method:"PUT",body:JSON.stringify(partite)});
+}
+
+function fbSaveCode(player, newCode){
+  var key=player.replace(/ /g,"_");
+  return fetch(FB_URL+"/codes/"+key+".json",{method:"PUT",body:JSON.stringify(newCode)});
+}
+
+function cambiaCodice(){
+  if(!loggedUser) return;
+  var attuale=document.getElementById("inp-pwd-attuale").value.trim();
+  var nuovo=document.getElementById("inp-pwd-nuovo").value.trim();
+  var conferma=document.getElementById("inp-pwd-conferma").value.trim();
+  if(!attuale||!nuovo||!conferma){sal("al-pwd","Compila tutti i campi.","aerr");return;}
+  if(CODES[loggedUser]!==attuale){sal("al-pwd","Codice attuale errato.","aerr");return;}
+  if(nuovo.length<4){sal("al-pwd","Il nuovo codice deve avere almeno 4 caratteri.","aerr");return;}
+  if(nuovo!==conferma){sal("al-pwd","I due nuovi codici non coincidono.","aerr");return;}
+  fbSaveCode(loggedUser, nuovo).then(function(){
+    CODES[loggedUser]=nuovo;
+    sal("al-pwd","Codice cambiato con successo!","aok");
+    document.getElementById("inp-pwd-attuale").value="";
+    document.getElementById("inp-pwd-nuovo").value="";
+    document.getElementById("inp-pwd-conferma").value="";
+  }).catch(function(){sal("al-pwd","Errore nel salvataggio.","aerr");});
+}
+
+function adminResetCodice(){
+  var p=document.getElementById("sel-resetp").value;
+  var nuovo=document.getElementById("inp-reset-code").value.trim();
+  if(!nuovo||nuovo.length<4){sal("al-reset","Inserisci un codice di almeno 4 caratteri.","aerr");return;}
+  fbSaveCode(p, nuovo).then(function(){
+    CODES[p]=nuovo;
+    sal("al-reset","Codice di "+p+" resettato a: "+nuovo,"aok");
+    document.getElementById("inp-reset-code").value="";
+    renderCodici();
+  }).catch(function(){sal("al-reset","Errore nel salvataggio.","aerr");});
 }
 
 // Wrapper per leggere pro/lock con chiave sanitizzata
@@ -275,23 +317,4 @@ var CAL_A = {
 };
 var CAL_B = {
   1:[["Emiliano","Flavio"],["Pipa","Paolo E"],["Matteo","Carlo"],["Chievo","Luca"],["Indrid","Silvio"],["Nikki","Gabriele"],["Tommy","Moka"]],
-  2:[["Moka","Emiliano"],["Gabriele","Tommy"],["Silvio","Nikki"],["Luca","Indrid"],["Carlo","Chievo"],["Paolo E","Matteo"],["Flavio","Pipa"]],
-  3:[["Emiliano","Indrid"],["Nikki","Chievo"],["Tommy","Matteo"],["Moka","Pipa"],["Gabriele","Flavio"],["Silvio","Paolo E"],["Luca","Carlo"]],
-  4:[["Carlo","Emiliano"],["Paolo E","Luca"],["Flavio","Silvio"],["Pipa","Gabriele"],["Matteo","Moka"],["Chievo","Tommy"],["Indrid","Nikki"]],
-  5:[["Emiliano","Nikki"],["Tommy","Indrid"],["Moka","Chievo"],["Gabriele","Matteo"],["Silvio","Pipa"],["Luca","Flavio"],["Carlo","Paolo E"]],
-  6:[["Gabriele","Emiliano"],["Moka","Silvio"],["Tommy","Luca"],["Nikki","Carlo"],["Indrid","Paolo E"],["Chievo","Flavio"],["Matteo","Pipa"]],
-  7:[["Emiliano","Tommy"],["Nikki","Moka"],["Indrid","Gabriele"],["Silvio","Chievo"],["Luca","Matteo"],["Pipa","Carlo"],["Paolo E","Flavio"]],
-  8:[["Luca","Emiliano"],["Carlo","Silvio"],["Paolo E","Gabriele"],["Flavio","Moka"],["Pipa","Tommy"],["Matteo","Nikki"],["Chievo","Indrid"]],
-  9:[["Emiliano","Chievo"],["Indrid","Matteo"],["Nikki","Pipa"],["Flavio","Tommy"],["Moka","Paolo E"],["Gabriele","Carlo"],["Silvio","Luca"]],
-  10:[["Paolo E","Emiliano"],["Carlo","Flavio"],["Pipa","Luca"],["Matteo","Silvio"],["Chievo","Gabriele"],["Moka","Indrid"],["Tommy","Nikki"]],
-  11:[["Emiliano","Pipa"],["Flavio","Matteo"],["Chievo","Paolo E"],["Indrid","Carlo"],["Nikki","Luca"],["Tommy","Silvio"],["Gabriele","Moka"]],
-  12:[["Silvio","Emiliano"],["Luca","Gabriele"],["Carlo","Moka"],["Paolo E","Tommy"],["Flavio","Nikki"],["Pipa","Indrid"],["Matteo","Chievo"]],
-  13:[["Emiliano","Matteo"],["Chievo","Pipa"],["Indrid","Flavio"],["Nikki","Paolo E"],["Tommy","Carlo"],["Moka","Luca"],["Gabriele","Silvio"]]
-};
-
-// ---- UTILITY ----
-function sign(a,b){if(a>b)return"1";if(a<b)return"2";return"X";}
-
-function getPartite(g){
-  if(PARTITE[g]) return PARTITE[g].map(function(p){return{casa:p[0],traf:p[1]};});
-  if(g===39&&DB.partite39
+  2:[["Moka","Emiliano"],["Gabriele","Tommy"],["Silvio","Nikki"],["Luca","Indrid"],["Carlo",

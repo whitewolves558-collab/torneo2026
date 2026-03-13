@@ -162,7 +162,12 @@ function fbLoad(){
         var id=activeTab.id.replace("tab-","");
         if(id==="class") renderClassifica();
         if(id==="tutti") renderTutti();
-        if(id==="miei"&&loggedUser) loadPronoForm();
+        if(id==="miei"&&loggedUser){
+          // Non ricaricare se l'utente sta compilando
+          var primo=document.getElementById("sc0c");
+          var staCompilando=primo&&primo.value!=="";
+          if(!staCompilando) loadPronoForm();
+        }
       }
     }catch(e){
       var d=document.getElementById("diag");
@@ -313,6 +318,4 @@ var CAL_A = {
   13:[["Tomaso","Ugo"],["Mirco","Beppino"],["Arnaldo","Paolo D"],["Genga","Eni"],["Franco","Roberto"],["Christian","Tizy"],["Gigi","Andrea F"]]
 };
 var CAL_B = {
-  1:[["Emiliano","Flavio"],["Pipa","Paolo E"],["Matteo","Carlo"],["Chievo","Luca"],["Indrid","Silvio"],["Nikki","Gabriele"],["Tommy","Moka"]],
-  2:[["Moka","Emiliano"],["Gabriele","Tommy"],["Silvio","Nikki"],["Luca","Indrid"],["Carlo","Chievo"],["Paolo E","Matteo"],["Flavio","Pipa"]],
-  3:[["Emiliano","Indrid"],[
+  1:[["Emiliano","Flavio"],["Pipa","Paolo E"],["Matteo","Carlo"],["Chievo","Luca"],["Indrid","Silvio"],["Nikki","

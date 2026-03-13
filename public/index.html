@@ -627,7 +627,9 @@ function renderTutti(){
 
 // ---- RISULTATI ----
 function loadRisForm(){
-  var g=parseInt(document.getElementById("sel-rg").value);
+  var el=document.getElementById("sel-rg");
+  if(!el) return;
+  var g=parseInt(el.value);
   var partite=getPartite(g);
   var saved=DB.ris[g]||[];
   var html="";

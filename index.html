@@ -157,6 +157,8 @@ function fbLoad(){
       }
       FB_READY=true;
       showConnStatus(true);
+      // Auto-login se credenziali salvate
+      if(!loggedUser) tryAutoLogin();
       var activeTab=document.querySelector(".tab.active");
       if(activeTab){
         var id=activeTab.id.replace("tab-","");
@@ -318,4 +320,4 @@ var CAL_A = {
   13:[["Tomaso","Ugo"],["Mirco","Beppino"],["Arnaldo","Paolo D"],["Genga","Eni"],["Franco","Roberto"],["Christian","Tizy"],["Gigi","Andrea F"]]
 };
 var CAL_B = {
-  1:[["Emiliano","Flavio"],["Pipa","Paolo E"],["Matteo","Carlo"],["Chievo","Luca"],["Indrid","Silvio"],["Nikki","
+  1:[["Emiliano","Flavio"],["Pip

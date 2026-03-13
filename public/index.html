@@ -136,8 +136,6 @@ function showConnStatus(ok){
   el.style.color=ok?"#86efac":"#fca5a5";
 }
 
-var FB_URL = "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app";
-
 // Carica tutto il DB da Firebase via REST e aggiorna ogni 30 secondi
 function fbInit(){
   fbLoad();
@@ -317,4 +315,679 @@ var CAL_A = {
 };
 var CAL_B = {
   1:[["Emiliano","Flavio"],["Pipa","Paolo E"],["Matteo","Carlo"],["Chievo","Luca"],["Indrid","Silvio"],["Nikki","Gabriele"],["Tommy","Moka"]],
-  2:[["Moka","Emiliano"],["Gabriele","Tommy"],["Silvio","Nikki"],["Luca","Indrid"],["Carlo",
+  2:[["Moka","Emiliano"],["Gabriele","Tommy"],["Silvio","Nikki"],["Luca","Indrid"],["Carlo","Chievo"],["Paolo E","Matteo"],["Flavio","Pipa"]],
+  3:[["Emiliano","Indrid"],["Nikki","Chievo"],["Tommy","Matteo"],["Moka","Pipa"],["Gabriele","Flavio"],["Silvio","Paolo E"],["Luca","Carlo"]],
+  4:[["Carlo","Emiliano"],["Paolo E","Luca"],["Flavio","Silvio"],["Pipa","Gabriele"],["Matteo","Moka"],["Chievo","Tommy"],["Indrid","Nikki"]],
+  5:[["Emiliano","Nikki"],["Tommy","Indrid"],["Moka","Chievo"],["Gabriele","Matteo"],["Silvio","Pipa"],["Luca","Flavio"],["Carlo","Paolo E"]],
+  6:[["Gabriele","Emiliano"],["Moka","Silvio"],["Tommy","Luca"],["Nikki","Carlo"],["Indrid","Paolo E"],["Chievo","Flavio"],["Matteo","Pipa"]],
+  7:[["Emiliano","Tommy"],["Nikki","Moka"],["Indrid","Gabriele"],["Silvio","Chievo"],["Luca","Matteo"],["Pipa","Carlo"],["Paolo E","Flavio"]],
+  8:[["Luca","Emiliano"],["Carlo","Silvio"],["Paolo E","Gabriele"],["Flavio","Moka"],["Pipa","Tommy"],["Matteo","Nikki"],["Chievo","Indrid"]],
+  9:[["Emiliano","Chievo"],["Indrid","Matteo"],["Nikki","Pipa"],["Flavio","Tommy"],["Moka","Paolo E"],["Gabriele","Carlo"],["Silvio","Luca"]],
+  10:[["Paolo E","Emiliano"],["Carlo","Flavio"],["Pipa","Luca"],["Matteo","Silvio"],["Chievo","Gabriele"],["Moka","Indrid"],["Tommy","Nikki"]],
+  11:[["Emiliano","Pipa"],["Flavio","Matteo"],["Chievo","Paolo E"],["Indrid","Carlo"],["Nikki","Luca"],["Tommy","Silvio"],["Gabriele","Moka"]],
+  12:[["Silvio","Emiliano"],["Luca","Gabriele"],["Carlo","Moka"],["Paolo E","Tommy"],["Flavio","Nikki"],["Pipa","Indrid"],["Matteo","Chievo"]],
+  13:[["Emiliano","Matteo"],["Chievo","Pipa"],["Indrid","Flavio"],["Nikki","Paolo E"],["Tommy","Carlo"],["Moka","Luca"],["Gabriele","Silvio"]]
+};
+
+// ---- UTILITY ----
+function sign(a,b){if(a>b)return"1";if(a<b)return"2";return"X";}
+
+function getPartite(g){
+  if(PARTITE[g]) return PARTITE[g].map(function(p){return{casa:p[0],traf:p[1]};});
+  if(g===39&&DB.partite39&&DB.partite39.length>0) return DB.partite39;
+  return null;
+}
+
+function getCalGiornata(g){
+  if(g>=1&&g<=13) return g;
+  if(g>=14&&g<=26) return g-13;
+  if(g>=27&&g<=39) return g-26;
+  return null;
+}
+
+function isRitornoG(g){return g>=14&&g<=26;}
+
+function getCalMatchesForG(g){
+  var cg=getCalGiornata(g);
+  if(!cg) return{a:[],b:[]};
+  var ritorno=isRitornoG(g);
+  function flipIfRitorno(arr){
+    return arr.map(function(m){return ritorno?[m[1],m[0]]:m;});
+  }
+  return{a:flipIfRitorno(CAL_A[cg]),b:flipIfRitorno(CAL_B[cg])};
+}
+
+// Calcola punti pronostici di un giocatore per una giornata
+function calcPtProno(player, g){
+  var pronos=getProPlayer(g, player);
+  var ris=getRisForG(g);
+  if(!pronos||!ris) return null;
+  var hasR=ris.some(function(r){return r&&r.gC!=="";});
+  if(!hasR) return null;
+  var tot=0,ex=0;
+  for(var i=0;i<ris.length;i++){
+    var r=ris[i]; if(!r||r.gC==="") continue;
+    var p=pronos[i]; if(!p||p.gC==="") continue;
+    var pC=parseInt(p.gC),pT=parseInt(p.gT);
+    var rC=parseInt(r.gC),rT=parseInt(r.gT);
+    if(pC===rC&&pT===rT){tot+=3;ex++;}
+    else if(sign(pC,pT)===sign(rC,rT)){tot+=1;}
+  }
+  return{tot:tot,ex:ex};
+}
+
+function getRisForG(g){
+  var partite=getPartite(g);
+  var saved=DB.ris[g]||[];
+  if(!partite) return saved;
+  return partite.map(function(p,i){
+    var s=saved[i]||{};
+    return{casa:p.casa,traf:p.traf,gC:s.gC||"",gT:s.gT||""};
+  });
+}
+
+// Calcola classifica completa da G27 in poi
+function buildClassifica(){
+  var stats={};
+  ALL.forEach(function(p){
+    var b=BASE[p]||{pt:0,re:0,v:0,par:0,s:0,gf:0,gs:0,bon:0};
+    stats[p]={pt:b.pt,re:b.re,v:b.v,par:b.par,s:b.s,gf:b.gf,gs:b.gs,bon:b.bon};
+  });
+  // Processa G27-G39
+  for(var g=27;g<=TOTAL_G;g++){
+    var ris=getRisForG(g);
+    var hasR=ris.some(function(r){return r&&r.gC!=="";});
+    if(!hasR) continue;
+    var cal=getCalMatchesForG(g);
+    var allMatches=cal.a.concat(cal.b);
+    for(var m=0;m<allMatches.length;m++){
+      var match=allMatches[m];
+      var p1=match[0],p2=match[1];
+      if(!stats[p1]||!stats[p2]) continue;
+      var r1=calcPtProno(p1,g);
+      var r2=calcPtProno(p2,g);
+      if(!r1||!r2) continue;
+      var pt1=r1.tot,pt2=r2.tot;
+      // Gol fatti/subiti
+      stats[p1].gf+=pt1; stats[p1].gs+=pt2;
+      stats[p2].gf+=pt2; stats[p2].gs+=pt1;
+      // RE
+      stats[p1].re+=r1.ex;
+      stats[p2].re+=r2.ex;
+      // Bonus 10+
+      if(pt1>=10){stats[p1].bon++;stats[p1].pt++;}
+      if(pt2>=10){stats[p2].bon++;stats[p2].pt++;}
+      // Vittoria/pareggio/sconfitta
+      if(pt1>pt2){stats[p1].pt+=3;stats[p1].v++;stats[p2].s++;}
+      else if(pt1<pt2){stats[p2].pt+=3;stats[p2].v++;stats[p1].s++;}
+      else{stats[p1].pt+=1;stats[p1].par++;stats[p2].pt+=1;stats[p2].par++;}
+    }
+  }
+  return stats;
+}
+
+function sortClassifica(arr,stats){
+  return arr.slice().sort(function(a,b){
+    var sa=stats[a],sb=stats[b];
+    if(sb.pt!==sa.pt) return sb.pt-sa.pt;
+    if(sb.re!==sa.re) return sb.re-sa.re;
+    var diffa=sa.gf-sa.gs, diffb=sb.gf-sb.gs;
+    if(diffb!==diffa) return diffb-diffa;
+    return sb.gf-sa.gf;
+  });
+}
+
+// ---- UI UTILS ----
+function sal(id,msg,cls){
+  var e=document.getElementById(id);
+  if(!e)return;
+  if(!msg){e.innerHTML="";return;}
+  e.innerHTML='<div class="alert '+cls+'">'+msg+'</div>';
+}
+
+function showPage(id){
+  ["class","miei","tutti","cal","admin"].forEach(function(p){
+    document.getElementById("page-"+p).classList.remove("active");
+    document.getElementById("tab-"+p).classList.remove("active");
+  });
+  document.getElementById("page-"+id).classList.add("active");
+  document.getElementById("tab-"+id).classList.add("active");
+  if(id==="class") renderClassifica();
+  if(id==="tutti") renderTutti();
+  if(id==="cal") renderCal();
+}
+
+function fillG(){
+  ["sel-pg","sel-tg","sel-rg","sel-calg","sel-ulkg","sel-delg"].forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    el.innerHTML="";
+    for(var n=1;n<=TOTAL_G;n++){
+      var o=document.createElement("option");
+      o.value=n;o.textContent="Giornata "+n;
+      if(n===CUR_G)o.selected=true;
+      el.appendChild(o);
+    }
+  });
+}
+
+// ---- CLASSIFICA ----
+function renderClassifica(){
+  var stats=buildClassifica();
+  function renderGirone(players,cls,label){
+    var sorted=sortClassifica(players,stats);
+    var html='<div class="cl-girone '+cls+'">'+label+'</div>';
+    html+='<table class="cl-table"><thead><tr>';
+    html+='<th style="width:22px">#</th><th style="text-align:left">Giocatore</th>';
+    html+='<th>Pt</th><th>V</th><th>P</th><th>S</th><th>GF</th><th>GS</th><th>RE</th><th>Bon</th>';
+    html+='</tr></thead><tbody>';
+    for(var i=0;i<sorted.length;i++){
+      var p=sorted[i],s=stats[p];
+      var rowcls=i===0?"pos1":i===1?"pos2":i===2?"pos3":"";
+      html+='<tr class="'+rowcls+'">';
+      html+='<td class="cl-pos">'+(i+1)+'</td>';
+      html+='<td class="cl-name">'+p+'</td>';
+      html+='<td class="cl-pts">'+s.pt+'</td>';
+      html+='<td class="cl-stat">'+s.v+'</td>';
+      html+='<td class="cl-stat">'+s.par+'</td>';
+      html+='<td class="cl-stat">'+s.s+'</td>';
+      html+='<td class="cl-stat">'+s.gf+'</td>';
+      html+='<td class="cl-stat">'+s.gs+'</td>';
+      html+='<td class="cl-re">'+s.re+'</td>';
+      html+='<td class="cl-bonus">'+s.bon+'</td>';
+      html+='</tr>';
+    }
+    html+='</tbody></table>';
+    return html;
+  }
+  var html=renderGirone(GA,"cl-ga","⚽ Girone A");
+  html+=renderGirone(GB,"cl-gb","⚽ Girone B");
+  document.getElementById("body-class").innerHTML=html;
+}
+
+// ---- LOGIN / PRONOSTICI ----
+var loggedUser=null;
+
+function doLogin(){
+  var nome=document.getElementById("sel-nome").value;
+  var code=document.getElementById("inp-code").value.trim();
+  if(!nome){sal("al-login","Seleziona il tuo nome.","aerr");return;}
+  if(CODES[nome]!==code){sal("al-login","Codice errato.","aerr");return;}
+  loggedUser=nome;
+  sal("al-login","","");
+  document.getElementById("box-login").style.display="none";
+  document.getElementById("box-prono").style.display="block";
+  var g=GA.indexOf(nome)>=0?"A":"B";
+  document.getElementById("lbl-user").textContent="Accesso: "+nome+" (Girone "+g+")";
+  loadPronoForm();
+}
+
+function doLogout(){
+  loggedUser=null;
+  document.getElementById("box-login").style.display="block";
+  document.getElementById("box-prono").style.display="none";
+  document.getElementById("inp-code").value="";
+  document.getElementById("sel-nome").value="";
+}
+
+function loadPronoForm(){
+  if(!loggedUser)return;
+  var g=parseInt(document.getElementById("sel-pg").value);
+  document.getElementById("hG").textContent=g;
+  var partite=getPartite(g);
+  var myP=getProPlayer(g, loggedUser);
+  var locked=getLockPlayer(g, loggedUser);
+  var cont=document.getElementById("rows-prono");
+  var btn=document.getElementById("btn-salva");
+  sal("al-prono","","");
+  if(!partite){
+    cont.innerHTML='<div class="alert ainfo">Partite G'+g+' non ancora disponibili.</div>';
+    btn.style.display="none";return;
+  }
+  if(locked) sal("al-prono","Pronostici bloccati. Chiedi all admin di sbloccarli.","awarn");
+  else if(myP) sal("al-prono","Puoi ancora modificare. Si bloccano al salvataggio.","awarn");
+  var html="";
+  for(var i=0;i<partite.length;i++){
+    var p=partite[i];
+    var gC=myP&&myP[i]?myP[i].gC:"";
+    var gT=myP&&myP[i]?myP[i].gT:"";
+    var dis=locked?"disabled":"";
+    html+='<div class="mrow"><div class="match-row">';
+    html+='<span class="team-name team-home">'+p.casa+'</span>';
+    html+='<span class="vsep">vs</span>';
+    html+='<span class="team-name team-away">'+p.traf+'</span>';
+    html+='<div class="score-wrap">';
+    html+='<input type="number" min="0" max="20" id="sc'+i+'c" value="'+gC+'" placeholder="-" '+dis+'/>';
+    html+='<span class="ssep">-</span>';
+    html+='<input type="number" min="0" max="20" id="sc'+i+'t" value="'+gT+'" placeholder="-" '+dis+'/>';
+    html+='</div></div></div>';
+  }
+  cont.innerHTML=html;
+  btn.style.display=locked?"none":"block";
+}
+
+function salvaProno(){
+  if(!loggedUser)return;
+  var g=parseInt(document.getElementById("sel-pg").value);
+  var partite=getPartite(g);
+  if(!partite)return;
+  var pronos={};var ok=true;
+  for(var i=0;i<partite.length;i++){
+    var ec=document.getElementById("sc"+i+"c");
+    var et=document.getElementById("sc"+i+"t");
+    if(!ec||!et||ec.value===""||et.value===""){ok=false;break;}
+    pronos[i]={gC:ec.value,gT:et.value};
+  }
+  if(!ok){sal("al-prono","Compila tutti i campi.","aerr");return;}
+  fbSavePro(g, loggedUser, pronos, true);
+  sal("al-prono","Pronostici G"+g+" salvati e bloccati!","aok");
+  document.getElementById("btn-salva").style.display="none";
+  var inputs=document.querySelectorAll("#rows-prono input");
+  for(var j=0;j<inputs.length;j++) inputs[j].disabled=true;
+}
+
+// ---- TUTTI ----
+function renderTutti(){
+  var g=parseInt(document.getElementById("sel-tg").value);
+  var ris=getRisForG(g);
+  var hasR=ris.some(function(r){return r&&r.gC!=""&&r.casa!="";});
+  var html="";
+  for(var pi=0;pi<ALL.length;pi++){
+    var player=ALL[pi];
+    var pronos=getProPlayer(g, player);
+    var badge=GA.indexOf(player)>=0?'<span class="ga">A</span>':'<span class="gb">B</span>';
+    if(!pronos){
+      html+='<div class="pblock"><div class="phead"><span class="pname">'+player+badge+'</span><span class="pstatus">Non inserito</span></div></div>';
+      continue;
+    }
+    var tot=0,ex=0,sg=0,rows="";
+    for(var i=0;i<10;i++){
+      var r=ris[i];if(!r||!r.casa)continue;
+      var p=pronos[i];
+      if(!p||p.gC===""){rows+='<div class="pitem"><span class="pteam">'+r.casa+' vs '+r.traf+'</span><span class="pval">-</span></div>';continue;}
+      var pC=parseInt(p.gC),pT=parseInt(p.gT);
+      var bc="bnd",bt="...";
+      if(hasR&&r.gC!==""){
+        var rC=parseInt(r.gC),rT=parseInt(r.gT);
+        if(pC===rC&&pT===rT){bc="bex";bt="+3";tot+=3;ex++;}
+        else if(sign(pC,pT)===sign(rC,rT)){bc="bsg";bt="+1";tot+=1;sg++;}
+        else{bc="bno";bt="0";}
+      }
+      rows+='<div class="pitem"><span class="pteam">'+r.casa+' vs '+r.traf+'</span>';
+      rows+='<span style="display:flex;align-items:center;gap:6px"><span class="pval">'+p.gC+'-'+p.gT+'</span><span class="badge '+bc+'">'+bt+'</span></span></div>';
+    }
+    var ptInfo=calcPtProno(player,g);
+    var bonInfo=ptInfo&&ptInfo.tot>=10?" 🎯":"";
+    var st=hasR?(tot+"pt"+bonInfo):"OK";
+    html+='<div class="pblock"><div class="phead" onclick="document.getElementById(\'pr'+pi+'\').classList.toggle(\'open\')"><span class="pname">'+player+badge+'</span><span class="pstatus ok">'+st+' ▾</span></div>';
+    html+='<div class="prows" id="pr'+pi+'">'+rows+'</div></div>';
+  }
+  document.getElementById("body-tutti").innerHTML=html||'<div style="text-align:center;padding:30px;color:#64748b">Nessun pronostico.</div>';
+}
+
+// ---- RISULTATI ----
+function loadRisForm(){
+  var g=parseInt(document.getElementById("sel-rg").value);
+  var partite=getPartite(g);
+  var saved=DB.ris[g]||[];
+  var html="";
+  if(partite){
+    for(var i=0;i<partite.length;i++){
+      var p=partite[i];var sr=saved[i]||{gC:"",gT:""};
+      html+='<div class="mrow"><div class="match-row">';
+      html+='<span class="team-name team-home">'+p.casa+'</span>';
+      html+='<span class="vsep">vs</span>';
+      html+='<span class="team-name team-away">'+p.traf+'</span>';
+      html+='<div class="score-wrap">';
+      html+='<input type="number" min="0" id="rg'+i+'c" value="'+(sr.gC||"")+'" placeholder="-"/>';
+      html+='<span class="ssep">-</span>';
+      html+='<input type="number" min="0" id="rg'+i+'t" value="'+(sr.gT||"")+'" placeholder="-"/>';
+      html+='</div></div></div>';
+    }
+    html+='<button class="btn btn-blue" onclick="salvaRis()">💾 Salva Risultati</button>';
+  } else {
+    html+='<p style="font-size:12px;color:#64748b;margin-bottom:10px">G'+g+': inserisci squadre e risultati manualmente.</p>';
+    for(var i=0;i<10;i++){
+      var r=saved[i]||{casa:"",traf:"",gC:"",gT:""};
+      html+='<div class="mrow">';
+      html+='<div style="display:flex;gap:5px;margin-bottom:7px">';
+      html+='<input type="text" placeholder="Casa" id="rc'+i+'c" value="'+(r.casa||"")+'" style="flex:1;margin:0;padding:7px 9px;font-size:12px"/>';
+      html+='<input type="text" placeholder="Trasferta" id="rc'+i+'t" value="'+(r.traf||"")+'" style="flex:1;margin:0;padding:7px 9px;font-size:12px"/>';
+      html+='</div><div class="score-wrap">';
+      html+='<input type="number" min="0" id="rg'+i+'c" value="'+(r.gC||"")+'" placeholder="-"/>';
+      html+='<span class="ssep">-</span>';
+      html+='<input type="number" min="0" id="rg'+i+'t" value="'+(r.gT||"")+'" placeholder="-"/>';
+      html+='</div></div>';
+    }
+    html+='<button class="btn btn-blue" onclick="salvaRisLibero()">💾 Salva Risultati</button>';
+  }
+  document.getElementById("rows-ris").innerHTML=html;
+}
+
+function salvaRis(){
+  var g=parseInt(document.getElementById("sel-rg").value);
+  var partite=getPartite(g);if(!partite)return;
+  var data=[];
+  for(var i=0;i<partite.length;i++){
+    data.push({casa:partite[i].casa,traf:partite[i].traf,gC:document.getElementById("rg"+i+"c").value||"",gT:document.getElementById("rg"+i+"t").value||""});
+  }
+  fbSaveRis(g, data);
+  sal("al-ris","Risultati G"+g+" salvati!","aok");
+  setTimeout(function(){sal("al-ris","","");},3000);
+}
+
+function salvaRisLibero(){
+  var g=parseInt(document.getElementById("sel-rg").value);
+  var data=[];
+  for(var i=0;i<10;i++){
+    var cEl=document.getElementById("rc"+i+"c");
+    var tEl=document.getElementById("rc"+i+"t");
+    data.push({casa:cEl?cEl.value:"",traf:tEl?tEl.value:"",gC:document.getElementById("rg"+i+"c").value||"",gT:document.getElementById("rg"+i+"t").value||""});
+  }
+  fbSaveRis(g, data);
+  sal("al-ris","Risultati G"+g+" salvati!","aok");
+  setTimeout(function(){sal("al-ris","","");},3000);
+}
+
+// ---- CALENDARIO ----
+function renderCal(){
+  var g=parseInt(document.getElementById("sel-calg").value);
+  var cal=getCalMatchesForG(g);
+  var cg=getCalGiornata(g);
+  if(!cg){document.getElementById("body-cal").innerHTML='<div class="alert ainfo">Nessun dato.</div>';return;}
+  var tipo=isRitornoG(g)?" (Ritorno)":g>=27?" (Andata bis)":" (Andata)";
+  function renderMatches(matches,titolo,cls){
+    var h='<div style="font-size:11px;font-weight:700;color:'+cls+';letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">'+titolo+'</div>';
+    for(var i=0;i<matches.length;i++){
+      var m=matches[i];
+      h+='<div class="cal-row">';
+      h+='<span class="cal-team cal-home">'+m[0]+'</span>';
+      h+='<span class="cal-vs">VS</span>';
+      h+='<span class="cal-team cal-away">'+m[1]+'</span>';
+      h+='</div>';
+    }
+    return h;
+  }
+  var html='<p style="font-size:11px;color:#64748b;margin-bottom:12px">Giornata '+g+tipo+'</p>';
+  html+=renderMatches(cal.a,"⚽ Girone A","#93c5fd");
+  html+='<div style="margin:14px 0 10px;border-top:1px solid rgba(255,255,255,0.06)"></div>';
+  html+=renderMatches(cal.b,"⚽ Girone B","#d8b4fe");
+  document.getElementById("body-cal").innerHTML=html;
+}
+
+// ---- ADMIN ----
+function doAdminLogin(){
+  if(document.getElementById("inp-apwd").value!==ADMIN_PWD){sal("al-alog","Password errata.","aerr");return;}
+  document.getElementById("box-al").style.display="none";
+  document.getElementById("box-ap").style.display="block";
+  renderCodici();
+  loadPartite39Form();
+}
+
+function doAdminLogout(){
+  document.getElementById("box-al").style.display="block";
+  document.getElementById("box-ap").style.display="none";
+  document.getElementById("inp-apwd").value="";
+}
+
+function adminUnlock(){
+  var p=document.getElementById("sel-ulkp").value;
+  var g=parseInt(document.getElementById("sel-ulkg").value);
+  fbSaveLock(g, p, false);
+  sal("al-ulk","Sbloccato "+p+" G"+g,"aok");
+}
+
+function adminDel(){
+  var p=document.getElementById("sel-delp").value;
+  var g=parseInt(document.getElementById("sel-delg").value);
+  fbDelPro(g, p);
+  sal("al-del","Eliminato "+p+" G"+g,"aok");
+}
+
+function renderCodici(){
+  var html="";
+  for(var i=0;i<ALL.length;i++){
+    var p=ALL[i];var g=GA.indexOf(p)>=0?"A":"B";
+    var col=g==="A"?"#93c5fd":"#d8b4fe";
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">';
+    html+='<span style="font-size:12px;font-weight:700;width:85px;flex-shrink:0">'+p+'</span>';
+    html+='<span style="font-size:9px;color:'+col+';width:18px">G'+g+'</span>';
+    html+='<span style="font-size:12px;color:#f5c518;font-weight:700">'+CODES[p]+'</span>';
+    html+='</div>';
+  }
+  document.getElementById("box-codici").innerHTML=html;
+}
+
+function loadPartite39Form(){
+  var saved=DB.partite39||[];
+  var html='<p style="font-size:11px;color:#64748b;margin-bottom:8px">Inserisci le partite della Giornata 39 (finale stagione).</p>';
+  for(var i=0;i<10;i++){
+    var sc=saved[i]?saved[i].casa:"";
+    var st=saved[i]?saved[i].traf:"";
+    html+='<div style="display:flex;gap:5px;margin-bottom:5px">';
+    html+='<input type="text" placeholder="Casa" id="p39c'+i+'" value="'+sc+'" style="flex:1;margin:0;padding:7px 9px;font-size:12px"/>';
+    html+='<input type="text" placeholder="Trasferta" id="p39t'+i+'" value="'+st+'" style="flex:1;margin:0;padding:7px 9px;font-size:12px"/>';
+    html+='</div>';
+  }
+  html+='<div id="al-p39"></div>';
+  html+='<button class="btn btn-gold" onclick="adminSalvaPartite39()" style="margin-top:6px">💾 Salva Partite G39</button>';
+  document.getElementById("box-p39").innerHTML=html;
+}
+
+function stampaClassifica(){
+  // Porta in primo piano la classifica e stampa
+  ["class","miei","tutti","cal","admin"].forEach(function(p){
+    document.getElementById("page-"+p).classList.remove("active");
+  });
+  document.getElementById("page-class").classList.add("active");
+  window.print();
+}
+
+function adminSalvaPartite39(){
+  var partite=[];
+  for(var i=0;i<10;i++){
+    var c=document.getElementById("p39c"+i);
+    var t=document.getElementById("p39t"+i);
+    if(c&&t&&c.value.trim()&&t.value.trim()) partite.push({casa:c.value.trim(),traf:t.value.trim()});
+  }
+  if(partite.length<1){sal("al-p39","Inserisci almeno una partita.","aerr");return;}
+  fbSavePartite39(partite);
+  sal("al-p39","Partite G39 salvate! ("+partite.length+")","aok");
+}
+</script>
+
+<div class="header">
+  <div style="font-size:30px">🏆</div>
+  <h1>Torneo Pronostici</h1>
+  <p>Serie A 2025/26 — Giornata <span id="hG">29</span> &nbsp;<span id="conn-status" style="font-size:10px">⏳ Connessione...</span></p>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-class" onclick="showPage('class')">🏆 Class.</button>
+  <button class="tab" id="tab-miei" onclick="showPage('miei')">✏️ Miei</button>
+  <button class="tab" id="tab-tutti" onclick="showPage('tutti')">👁️ Tutti</button>
+  <button class="tab" id="tab-cal" onclick="showPage('cal')">📅 Cal.</button>
+  <button class="tab" id="tab-admin" onclick="showPage('admin')">🔧 Admin</button>
+</div>
+
+<!-- CLASSIFICA -->
+<div id="page-class" class="page active">
+  <div class="card">
+    <h2>🏆 Classifica Torneo</h2>
+    <p style="font-size:11px;color:#64748b;margin-bottom:14px">Dati base G1-G26 + aggiornamento automatico dalle giornate successive.</p>
+    <div id="body-class"></div>
+    <button class="btn btn-gray" onclick="stampaClassifica()" style="margin-top:14px">🖨️ Stampa / Salva PDF</button>
+  </div>
+</div>
+
+<!-- I MIEI -->
+<div id="page-miei" class="page">
+  <div id="box-login" class="card">
+    <h2>✏️ I Miei Pronostici</h2>
+    <span class="flabel">Il tuo nome</span>
+    <select id="sel-nome">
+      <option value="">— Seleziona —</option>
+      <optgroup label="Girone A">
+        <option>Tizy</option><option>Ugo</option><option>Beppino</option>
+        <option>Franco</option><option>Mirco</option><option>Roberto</option>
+        <option>Arnaldo</option><option>Tomaso</option><option>Paolo D</option>
+        <option>Christian</option><option>Gigi</option><option>Genga</option>
+        <option>Andrea F</option><option>Eni</option>
+      </optgroup>
+      <optgroup label="Girone B">
+        <option>Indrid</option><option>Luca</option><option>Emiliano</option>
+        <option>Moka</option><option>Chievo</option><option>Carlo</option>
+        <option>Silvio</option><option>Tommy</option><option>Gabriele</option>
+        <option>Matteo</option><option>Paolo E</option><option>Nikki</option>
+        <option>Pipa</option><option>Flavio</option>
+      </optgroup>
+    </select>
+    <span class="flabel">Codice personale</span>
+    <input type="text" id="inp-code" placeholder="es. tizy01"/>
+    <div id="al-login"></div>
+    <button class="btn btn-gold" onclick="doLogin()">🔐 Accedi</button>
+  </div>
+  <div id="box-prono" style="display:none">
+    <div class="card">
+      <h2>✏️ Inserisci Pronostici</h2>
+      <p id="lbl-user" style="font-size:11px;color:#64748b;margin-bottom:8px"></p>
+      <div class="gbar">
+        <span class="flabel">GIORNATA</span>
+        <select id="sel-pg" onchange="loadPronoForm()"></select>
+      </div>
+      <div id="al-prono"></div>
+      <div id="rows-prono"></div>
+      <button class="btn btn-gold" id="btn-salva" onclick="salvaProno()" style="display:none">💾 Salva e Blocca</button>
+      <button class="btn btn-gray" onclick="doLogout()">Esci</button>
+    </div>
+    <div class="card">
+      <h2>🔑 Cambia Codice</h2>
+      <span class="flabel">Codice attuale</span>
+      <input type="text" id="inp-pwd-attuale" placeholder="Codice attuale"/>
+      <span class="flabel">Nuovo codice</span>
+      <input type="text" id="inp-pwd-nuovo" placeholder="Nuovo codice (min. 4 caratteri)"/>
+      <span class="flabel">Conferma nuovo codice</span>
+      <input type="text" id="inp-pwd-conferma" placeholder="Ripeti nuovo codice"/>
+      <div id="al-pwd"></div>
+      <button class="btn btn-blue" onclick="cambiaCodice()">🔑 Cambia Codice</button>
+    </div>
+  </div>
+</div>
+
+<!-- TUTTI -->
+<div id="page-tutti" class="page">
+  <div class="gbar">
+    <span class="flabel">GIORNATA</span>
+    <select id="sel-tg" onchange="renderTutti()"></select>
+  </div>
+  <div id="body-tutti"></div>
+</div>
+
+<!-- CALENDARIO -->
+<div id="page-cal" class="page">
+  <div class="card">
+    <h2>📅 Calendario Gironi</h2>
+    <div class="gbar">
+      <span class="flabel">GIORNATA</span>
+      <select id="sel-calg" onchange="renderCal()"></select>
+    </div>
+    <div id="body-cal"></div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="page-admin" class="page">
+  <div id="box-al" class="card">
+    <h2>🔧 Area Admin</h2>
+    <span class="flabel">Password</span>
+    <input type="password" id="inp-apwd" placeholder="Password admin"/>
+    <div id="al-alog"></div>
+    <button class="btn btn-blue" onclick="doAdminLogin()">🔐 Accedi</button>
+  </div>
+  <div id="box-ap" style="display:none">
+    <div class="card">
+      <h2>🔧 Pannello Admin</h2>
+      <div class="ssect">🔓 Sblocca pronostici</div>
+      <span class="flabel">Giocatore</span>
+      <select id="sel-ulkp">
+        <optgroup label="Girone A">
+          <option>Tizy</option><option>Ugo</option><option>Beppino</option>
+          <option>Franco</option><option>Mirco</option><option>Roberto</option>
+          <option>Arnaldo</option><option>Tomaso</option><option>Paolo D</option>
+          <option>Christian</option><option>Gigi</option><option>Genga</option>
+          <option>Andrea F</option><option>Eni</option>
+        </optgroup>
+        <optgroup label="Girone B">
+          <option>Indrid</option><option>Luca</option><option>Emiliano</option>
+          <option>Moka</option><option>Chievo</option><option>Carlo</option>
+          <option>Silvio</option><option>Tommy</option><option>Gabriele</option>
+          <option>Matteo</option><option>Paolo E</option><option>Nikki</option>
+          <option>Pipa</option><option>Flavio</option>
+        </optgroup>
+      </select>
+      <span class="flabel">Giornata</span>
+      <select id="sel-ulkg"></select>
+      <button class="btn btn-gold" onclick="adminUnlock()">🔓 Sblocca</button>
+      <div id="al-ulk"></div>
+      <div class="ssect">🗑️ Elimina pronostici</div>
+      <span class="flabel">Giocatore</span>
+      <select id="sel-delp">
+        <optgroup label="Girone A">
+          <option>Tizy</option><option>Ugo</option><option>Beppino</option>
+          <option>Franco</option><option>Mirco</option><option>Roberto</option>
+          <option>Arnaldo</option><option>Tomaso</option><option>Paolo D</option>
+          <option>Christian</option><option>Gigi</option><option>Genga</option>
+          <option>Andrea F</option><option>Eni</option>
+        </optgroup>
+        <optgroup label="Girone B">
+          <option>Indrid</option><option>Luca</option><option>Emiliano</option>
+          <option>Moka</option><option>Chievo</option><option>Carlo</option>
+          <option>Silvio</option><option>Tommy</option><option>Gabriele</option>
+          <option>Matteo</option><option>Paolo E</option><option>Nikki</option>
+          <option>Pipa</option><option>Flavio</option>
+        </optgroup>
+      </select>
+      <span class="flabel">Giornata</span>
+      <select id="sel-delg"></select>
+      <button class="btn btn-red" onclick="adminDel()">🗑️ Elimina</button>
+      <div id="al-del"></div>
+      <div class="ssect">🔑 Reset codice giocatore</div>
+      <span class="flabel">Giocatore</span>
+      <select id="sel-resetp">
+        <optgroup label="Girone A">
+          <option>Tizy</option><option>Ugo</option><option>Beppino</option>
+          <option>Franco</option><option>Mirco</option><option>Roberto</option>
+          <option>Arnaldo</option><option>Tomaso</option><option>Paolo D</option>
+          <option>Christian</option><option>Gigi</option><option>Genga</option>
+          <option>Andrea F</option><option>Eni</option>
+        </optgroup>
+        <optgroup label="Girone B">
+          <option>Indrid</option><option>Luca</option><option>Emiliano</option>
+          <option>Moka</option><option>Chievo</option><option>Carlo</option>
+          <option>Silvio</option><option>Tommy</option><option>Gabriele</option>
+          <option>Matteo</option><option>Paolo E</option><option>Nikki</option>
+          <option>Pipa</option><option>Flavio</option>
+        </optgroup>
+      </select>
+      <span class="flabel">Nuovo codice</span>
+      <input type="text" id="inp-reset-code" placeholder="Nuovo codice (min. 4 caratteri)"/>
+      <button class="btn btn-blue" onclick="adminResetCodice()">🔑 Resetta Codice</button>
+      <div id="al-reset"></div>
+      <div class="ssect">⚽ Partite Giornata 39</div>
+      <div id="box-p39"></div>
+      <div class="ssect">🔑 Codici personali</div>
+      <div id="box-codici"></div>
+      <button class="btn btn-gray" onclick="doAdminLogout()" style="margin-top:14px">Esci dall admin</button>
+    </div>
+  </div>
+</div>
+
+<script>
+fillG();
+renderClassifica();
+loadRisForm();
+renderCal();
+fbInit();
+</script>
+</body>
+</html>

@@ -293,14 +293,15 @@ var PARTITE = {
   28:[["Napoli","Torino"],["Cagliari","Como"],["Atalanta","Udinese"],["Juventus","Pisa"],["Lecce","Cremonese"],["Bologna","Verona"],["Fiorentina","Parma"],["Genoa","Roma"],["Milan","Inter"],["Lazio","Sassuolo"]],
   29:[["Torino","Parma"],["Inter","Atalanta"],["Napoli","Lecce"],["Udinese","Juventus"],["Verona","Genoa"],["Pisa","Cagliari"],["Sassuolo","Bologna"],["Como","Roma"],["Lazio","Milan"],["Cremonese","Fiorentina"]],
   30:[["Cagliari","Napoli"],["Genoa","Udinese"],["Parma","Cremonese"],["Milan","Torino"],["Juventus","Sassuolo"],["Como","Pisa"],["Atalanta","Verona"],["Bologna","Lazio"],["Roma","Lecce"],["Fiorentina","Inter"]],
-  31:[["Cremonese","Bologna"],["Inter","Roma"],["Juventus","Genoa"],["Lazio","Parma"],["Lecce","Atalanta"],["Napoli","Milan"],["Pisa","Torino"],["Sassuolo","Cagliari"],["Udinese","Como"],["Verona","Fiorentina"]],
-  32:[["Atalanta","Juventus"],["Bologna","Lecce"],["Cagliari","Cremonese"],["Como","Inter"],["Fiorentina","Lazio"],["Genoa","Sassuolo"],["Milan","Udinese"],["Parma","Napoli"],["Roma","Pisa"],["Torino","Verona"]],
-  33:[["Cremonese","Torino"],["Inter","Cagliari"],["Juventus","Bologna"],["Lecce","Fiorentina"],["Napoli","Lazio"],["Pisa","Genoa"],["Roma","Atalanta"],["Sassuolo","Como"],["Udinese","Parma"],["Verona","Milan"]],
-  34:[["Bologna","Roma"],["Cagliari","Atalanta"],["Fiorentina","Sassuolo"],["Genoa","Como"],["Lazio","Udinese"],["Milan","Juventus"],["Napoli","Cremonese"],["Parma","Pisa"],["Torino","Inter"],["Verona","Lecce"]],
-  35:[["Atalanta","Genoa"],["Bologna","Cagliari"],["Como","Napoli"],["Cremonese","Lazio"],["Inter","Parma"],["Juventus","Verona"],["Pisa","Lecce"],["Roma","Fiorentina"],["Sassuolo","Milan"],["Udinese","Torino"]],
-  36:[["Cagliari","Udinese"],["Cremonese","Pisa"],["Fiorentina","Genoa"],["Lazio","Inter"],["Lecce","Juventus"],["Milan","Atalanta"],["Napoli","Bologna"],["Parma","Roma"],["Torino","Sassuolo"],["Verona","Como"]],
-  37:[["Atalanta","Bologna"],["Cagliari","Torino"],["Como","Parma"],["Genoa","Milan"],["Inter","Verona"],["Juventus","Fiorentina"],["Pisa","Napoli"],["Roma","Lazio"],["Sassuolo","Lecce"],["Udinese","Cremonese"]],
-  38:[["Bologna","Inter"],["Cremonese","Como"],["Fiorentina","Atalanta"],["Lazio","Pisa"],["Lecce","Genoa"],["Milan","Cagliari"],["Napoli","Udinese"],["Parma","Sassuolo"],["Torino","Juventus"],["Verona","Roma"]]
+  31:[["Turchia","Romania"],["Georgia","Israele"],["R.Ceca","Irlanda"],["Danimarca","Macedonia"],["Italia","Nord Irlanda"],["Polonia","Albania"],["Slovacchia","Kosovo"],["Ucraina","Svezia"],["Galles","Bosnia"],["Brasile","Francia"]],
+  32:[["Cremonese","Bologna"],["Inter","Roma"],["Juventus","Genoa"],["Lazio","Parma"],["Lecce","Atalanta"],["Napoli","Milan"],["Pisa","Torino"],["Sassuolo","Cagliari"],["Udinese","Como"],["Verona","Fiorentina"]],
+  33:[["Atalanta","Juventus"],["Bologna","Lecce"],["Cagliari","Cremonese"],["Como","Inter"],["Fiorentina","Lazio"],["Genoa","Sassuolo"],["Milan","Udinese"],["Parma","Napoli"],["Roma","Pisa"],["Torino","Verona"]],
+  34:[["Cremonese","Torino"],["Inter","Cagliari"],["Juventus","Bologna"],["Lecce","Fiorentina"],["Napoli","Lazio"],["Pisa","Genoa"],["Roma","Atalanta"],["Sassuolo","Como"],["Udinese","Parma"],["Verona","Milan"]],
+  35:[["Bologna","Roma"],["Cagliari","Atalanta"],["Fiorentina","Sassuolo"],["Genoa","Como"],["Lazio","Udinese"],["Milan","Juventus"],["Napoli","Cremonese"],["Parma","Pisa"],["Torino","Inter"],["Verona","Lecce"]],
+  36:[["Atalanta","Genoa"],["Bologna","Cagliari"],["Como","Napoli"],["Cremonese","Lazio"],["Inter","Parma"],["Juventus","Verona"],["Pisa","Lecce"],["Roma","Fiorentina"],["Sassuolo","Milan"],["Udinese","Torino"]],
+  37:[["Cagliari","Udinese"],["Cremonese","Pisa"],["Fiorentina","Genoa"],["Lazio","Inter"],["Lecce","Juventus"],["Milan","Atalanta"],["Napoli","Bologna"],["Parma","Roma"],["Torino","Sassuolo"],["Verona","Como"]],
+  38:[["Atalanta","Bologna"],["Cagliari","Torino"],["Como","Parma"],["Genoa","Milan"],["Inter","Verona"],["Juventus","Fiorentina"],["Pisa","Napoli"],["Roma","Lazio"],["Sassuolo","Lecce"],["Udinese","Cremonese"]],
+  39:[["Bologna","Inter"],["Cremonese","Como"],["Fiorentina","Atalanta"],["Lazio","Pisa"],["Lecce","Genoa"],["Milan","Cagliari"],["Napoli","Udinese"],["Parma","Sassuolo"],["Torino","Juventus"],["Verona","Roma"]]
 };
 
 // Calendario gironi (Andata G1-G13; Ritorno G14-G26; Andata bis G27-G39)
@@ -337,6 +338,15 @@ var CAL_B = {
 
 // ---- UTILITY ----
 function sign(a,b){if(a>b)return"1";if(a<b)return"2";return"X";}
+
+// Auto-avanzamento cursore
+function autoNext(el, nextId){
+  if(el.value.length>=2){
+    if(el.max&&parseInt(el.value)>parseInt(el.max)) el.value=el.max;
+    var next=document.getElementById(nextId);
+    if(next){next.focus();next.select();}
+  }
+}
 
 function getPartite(g){
   if(PARTITE[g]) return PARTITE[g].map(function(p){return{casa:p[0],traf:p[1]};});
@@ -582,9 +592,14 @@ function loadPronoForm(){
     html+='<span class="vsep">vs</span>';
     html+='<span class="team-name team-away">'+p.traf+'</span>';
     html+='<div class="score-wrap">';
-    html+='<input type="number" min="0" max="20" id="sc'+i+'c" value="'+gC+'" placeholder="-" '+dis+'/>';
+    var n=partite.length;
+    var nextC="sc"+i+"t";
+    var nextT=i<n-1?"sc"+(i+1)+"c":"";
+    var onC=dis?"":" oninput=\"autoNext(this,'"+nextC+"')\"";
+    var onT=(!dis&&nextT)?" oninput=\"autoNext(this,'"+nextT+"')\"":"";
+    html+='<input type="number" min="0" max="20" id="sc'+i+'c" value="'+gC+'" placeholder="-" '+dis+onC+'/>';
     html+='<span class="ssep">-</span>';
-    html+='<input type="number" min="0" max="20" id="sc'+i+'t" value="'+gT+'" placeholder="-" '+dis+'/>';
+    html+='<input type="number" min="0" max="20" id="sc'+i+'t" value="'+gT+'" placeholder="-" '+dis+onT+'/>';
     html+='</div></div></div>';
   }
   cont.innerHTML=html;
@@ -661,14 +676,17 @@ function loadRisForm(){
   if(partite){
     for(var i=0;i<partite.length;i++){
       var p=partite[i];var sr=saved[i]||{gC:"",gT:""};
+      var nextC="rg"+i+"t";
+      var nextT=i<partite.length-1?"rg"+(i+1)+"c":"";
+      var onT=nextT?" oninput=\"autoNext(this,'"+nextT+"')\"":"";
       html+='<div class="mrow"><div class="match-row">';
       html+='<span class="team-name team-home">'+p.casa+'</span>';
       html+='<span class="vsep">vs</span>';
       html+='<span class="team-name team-away">'+p.traf+'</span>';
       html+='<div class="score-wrap">';
-      html+='<input type="number" min="0" id="rg'+i+'c" value="'+(sr.gC||"")+'" placeholder="-"/>';
+      html+='<input type="number" min="0" max="20" id="rg'+i+'c" value="'+(sr.gC||"")+'" placeholder="-" oninput="autoNext(this,\''+nextC+'\')" />';
       html+='<span class="ssep">-</span>';
-      html+='<input type="number" min="0" id="rg'+i+'t" value="'+(sr.gT||"")+'" placeholder="-"/>';
+      html+='<input type="number" min="0" max="20" id="rg'+i+'t" value="'+(sr.gT||"")+'" placeholder="-"'+onT+'/>';
       html+='</div></div></div>';
     }
   } else {
@@ -1034,7 +1052,7 @@ function adminSalvaPartite39(){
       <input type="text" id="inp-reset-code" placeholder="Nuovo codice (min. 4 caratteri)"/>
       <button class="btn btn-blue" onclick="adminResetCodice()">🔑 Resetta Codice</button>
       <div id="al-reset"></div>
-      <div class="ssect">⚽ Partite Giornata 39</div>
+      <div class="ssect">⚽ Partite Giornata 39 (libera)</div>
       <div id="box-p39"></div>
       <div class="ssect">🔑 Codici personali</div>
       <div id="box-codici"></div>

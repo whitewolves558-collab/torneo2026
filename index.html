@@ -1,4 +1,3 @@
-      c
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -37,10 +36,6 @@ input[type=number]{width:48px;padding:7px 2px;background:rgba(245,197,24,0.1);bo
 .gbar select{margin:0;background:none;border:none;color:#f5c518;font-size:14px;font-weight:800;flex:1;padding:0}
 /* Riga partita pronostici */
 .mrow{background:#1c2539;border-radius:12px;padding:10px 12px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.08)}
-.mrow.drag-over{border:2px solid #60a5fa;background:#1e3a5f}
-.drag-handle{color:#64748b;font-size:16px;margin-right:8px;cursor:grab}
-.move-btns{display:flex;flex-direction:column;gap:2px;margin-right:6px}
-.move-btn{background:rgba(255,255,255,0.08);border:none;color:#94a3b8;font-size:11px;padding:2px 6px;border-radius:4px;cursor:pointer;line-height:1}
 .match-row{display:flex;align-items:center;justify-content:space-between;gap:5px}
 .team-name{font-size:12px;font-weight:800;color:#fff;background:rgba(255,255,255,0.07);border-radius:7px;padding:6px 8px;flex:1;text-align:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .team-home{border-left:3px solid #f5c518}
@@ -272,9 +267,9 @@ var BASE = {
   "Christian":{pt:40,re:26,v:12,par:1,s:13,gf:178,gs:171,bon:3},
   "Gigi":     {pt:38,re:23,v:10,par:5,s:11,gf:173,gs:181,bon:3},
   "Beppino":  {pt:37,re:28,v:9, par:5,s:12,gf:186,gs:204,bon:5},
-  "Franco":   {pt:36,re:31,v:10,par:2,s:14,gf:183,gs:191,bon:4},
+  "Franco":   {pt:36,re:31,v:10,par:2,s:14,gf:183,gs:191,bon:4}, 
   "Mirco":    {pt:35,re:36,v:9, par:4,s:13,gf:187,gs:194,bon:4},
-  "Andrea F": {pt:35,re:26,v:9, par:2,s:15,gf:167,gs:190,bon:5},
+    "Andrea F": {pt:35,re:26,v:9, par:2,s:15,gf:167,gs:190,bon:5},
   "Roberto":  {pt:19,re:22,v:5, par:3,s:18,gf:152,gs:195,bon:1},
   "Indrid":   {pt:64,re:34,v:17,par:5,s:4, gf:196,gs:143,bon:8},
   "Luca":     {pt:56,re:32,v:16,par:2,s:8, gf:199,gs:176,bon:6},
@@ -344,35 +339,8 @@ var CAL_B = {
 // ---- UTILITY ----
 function sign(a,b){if(a>b)return"1";if(a<b)return"2";return"X";}
 
-// ---- RIORDINO RISULTATI CON FRECCE ----
-function moveRisRow(btn, dir){
-  var row=btn.closest(".mrow[data-idx]");
-  var container=document.getElementById("rows-ris");
-  var rows=Array.from(container.querySelectorAll(".mrow[data-idx]"));
-  var idx=rows.indexOf(row);
-  var newIdx=idx+dir;
-  if(newIdx<0||newIdx>=rows.length) return;
-  if(dir===-1) container.insertBefore(row,rows[newIdx]);
-  else container.insertBefore(rows[newIdx],row);
-  refreshAutoNext();
-}
-
-function refreshAutoNext(){
-  // Dopo riordino aggiorna gli oninput per autoNext in base alla nuova posizione
-  var container=document.getElementById("rows-ris");
-  if(!container) return;
-  var rows=Array.from(container.querySelectorAll(".mrow[data-idx]"));
-  rows.forEach(function(row,pos){
-    var inpC=row.querySelector("input[id$='c']");
-    var inpT=row.querySelector("input[id$='t']");
-    if(!inpC||!inpT) return;
-    var nextC=inpT.id;
-    var nextTRow=rows[pos+1];
-    var nextTId=nextTRow?nextTRow.querySelector("input[id$='c']").id:"";
-    inpC.oninput=function(){autoNext(this,nextC);};
-    inpT.oninput=nextTId?function(){autoNext(this,nextTId);}:null;
-  });
-}
+// Auto-avanzamento cursore
+function autoNext(el, nextId){
   if(el.value.length>=1){
     if(el.max&&parseInt(el.value)>parseInt(el.max)) el.value=el.max;
     var next=document.getElementById(nextId);
@@ -571,8 +539,8 @@ function doLogin(){
   var g=GA.indexOf(nome)>=0?"A":"B";
   document.getElementById("lbl-user").textContent="Accesso: "+nome+" (Girone "+g+")";
   loadPronoForm();
-}
-
+  }
+ 
 function doLogout(){
   loggedUser=null;
   // Cancella login salvato
@@ -711,9 +679,7 @@ function loadRisForm(){
       var nextC="rg"+i+"t";
       var nextT=i<partite.length-1?"rg"+(i+1)+"c":"";
       var onT=nextT?" oninput=\"autoNext(this,'"+nextT+"')\"":"";
-      html+='<div class="mrow" data-idx="'+i+'">';
-      html+='<div class="match-row">';
-      html+='<div class="move-btns"><button class="move-btn" onclick="moveRisRow(this,-1)">▲</button><button class="move-btn" onclick="moveRisRow(this,1)">▼</button></div>';
+      html+='<div class="mrow"><div class="match-row">';
       html+='<span class="team-name team-home">'+p.casa+'</span>';
       html+='<span class="vsep">vs</span>';
       html+='<span class="team-name team-away">'+p.traf+'</span>';
@@ -739,28 +705,14 @@ function loadRisForm(){
     }
   }
   document.getElementById("rows-ris").innerHTML=html;
-  refreshAutoNext();
 }
 
 function salvaRis(){
   var g=parseInt(document.getElementById("sel-rg").value);
-  var container=document.getElementById("rows-ris");
-  var rows=container.querySelectorAll(".mrow[data-idx]");
+  var partite=getPartite(g);if(!partite)return;
   var data=[];
-  rows.forEach(function(row,pos){
-    var inpC=row.querySelector("input[id$='c']");
-    var inpT=row.querySelector("input[id$='t']");
-    var nomeCasa=row.querySelector(".team-home").textContent;
-    var nomeTraf=row.querySelector(".team-away").textContent;
-    data.push({casa:nomeCasa,traf:nomeTraf,gC:inpC?inpC.value:"",gT:inpT?inpT.value:""});
-  });
-  // Se non ci sono righe con data-idx (G39 libera) usa il vecchio metodo
-  if(data.length===0){
-    var partite=getPartite(g);
-    if(!partite) return salvaRisLibero();
-    for(var i=0;i<partite.length;i++){
-      data.push({casa:partite[i].casa,traf:partite[i].traf,gC:document.getElementById("rg"+i+"c").value||"",gT:document.getElementById("rg"+i+"t").value||""});
-    }
+  for(var i=0;i<partite.length;i++){
+    data.push({casa:partite[i].casa,traf:partite[i].traf,gC:document.getElementById("rg"+i+"c").value||"",gT:document.getElementById("rg"+i+"t").value||""});
   }
   fbSaveRis(g, data);
   sal("al-ris","Risultati G"+g+" salvati!","aok");
@@ -859,7 +811,7 @@ function adminDel(){
   var p=document.getElementById("sel-delp").value;
   var g=parseInt(document.getElementById("sel-delg").value);
   fbDelPro(g, p);
-  sal("al-del","Eliminato "+p+" G"+g,"aok");
+    sal("al-del","Eliminato "+p+" G"+g,"aok");
 }
 
 function renderCodici(){

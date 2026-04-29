@@ -554,7 +554,17 @@ function doLogin(){
   document.getElementById("lbl-user").textContent="Accesso: "+nome+" (Girone "+g+")";
   loadPronoForm();
 }
+  
 
+function doLogout(){
+  loggedUser=null;
+  // Cancella login salvato
+  try{localStorage.removeItem("tp_user");localStorage.removeItem("tp_code");}catch(e){}
+  document.getElementById("box-login").style.display="block";
+  document.getElementById("box-prono").style.display="none";
+  document.getElementById("inp-code").value="";
+  document.getElementById("sel-nome").value="";
+    } 
 function tryAutoLogin(){
   try{
     var nome=localStorage.getItem("tp_user");
@@ -836,8 +846,8 @@ function doAdminLogout(){
   document.getElementById("box-al").style.display="block";
   document.getElementById("box-ap").style.display="none";
   document.getElementById("inp-apwd").value="";
-}
-
+    }
+ 
 function adminUnlock(){
   var p=document.getElementById("sel-ulkp").value;
   var g=parseInt(document.getElementById("sel-ulkg").value);
@@ -1118,13 +1128,4 @@ window.onload=function(){
 };
 </script>
 </body>
-</html>
-function doLogout(){
-  loggedUser=null;
-  // Cancella login salvato
-  try{localStorage.removeItem("tp_user");localStorage.removeItem("tp_code");}catch(e){}
-  document.getElementById("box-login").style.display="block";
-  document.getElementById("box-prono").style.display="none";
-  document.getElementById("inp-code").value="";
-  document.getElementById("sel-nome").value="";
-}
+</html> 

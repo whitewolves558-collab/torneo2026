@@ -35,11 +35,10 @@ input[type=number]{width:48px;padding:7px 2px;background:rgba(245,197,24,0.1);bo
 .gbar .flabel{margin:0;white-space:nowrap}
 .gbar select{margin:0;background:none;border:none;color:#f5c518;font-size:14px;font-weight:800;flex:1;padding:0}
 /* Riga partita pronostici */
-.mrow{background:#1c2539;border-radius:12px;padding:10px 12px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.08)}
+.mrow{background:#1c2539;border-radius:12px;padding:10px 12px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.08);cursor:grab;touch-action:none}
+.mrow.dragging{opacity:0.4;border:2px dashed #f5c518}
 .mrow.drag-over{border:2px solid #60a5fa;background:#1e3a5f}
 .drag-handle{color:#64748b;font-size:16px;margin-right:8px;cursor:grab}
-.move-btns{display:flex;flex-direction:column;gap:2px;margin-right:6px}
-.move-btn{background:rgba(255,255,255,0.08);border:none;color:#94a3b8;font-size:11px;padding:2px 6px;border-radius:4px;cursor:pointer;line-height:1}
 .match-row{display:flex;align-items:center;justify-content:space-between;gap:5px}
 .team-name{font-size:12px;font-weight:800;color:#fff;background:rgba(255,255,255,0.07);border-radius:7px;padding:6px 8px;flex:1;text-align:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .team-home{border-left:3px solid #f5c518}
@@ -343,17 +342,68 @@ var CAL_B = {
 // ---- UTILITY ----
 function sign(a,b){if(a>b)return"1";if(a<b)return"2";return"X";}
 
-// ---- RIORDINO RISULTATI CON FRECCE ----
-function moveRisRow(btn, dir){
-  var row=btn.closest(".mrow[data-idx]");
+// ---- DRAG & DROP RISULTATI ----
+var dragSrc=null;
+var risOrdine=[]; // ordine corrente delle partite (indici originali)
+
+function initDragDrop(){
   var container=document.getElementById("rows-ris");
-  var rows=Array.from(container.querySelectorAll(".mrow[data-idx]"));
-  var idx=rows.indexOf(row);
-  var newIdx=idx+dir;
-  if(newIdx<0||newIdx>=rows.length) return;
-  if(dir===-1) container.insertBefore(row,rows[newIdx]);
-  else container.insertBefore(rows[newIdx],row);
-  refreshAutoNext();
+  if(!container) return;
+  var rows=container.querySelectorAll(".mrow[data-idx]");
+
+  rows.forEach(function(row){
+    // Touch events per mobile
+    row.addEventListener("touchstart",function(e){
+      dragSrc=row;
+      row.classList.add("dragging");
+    },{passive:true});
+
+    row.addEventListener("touchmove",function(e){
+      e.preventDefault();
+      var touch=e.touches[0];
+      var target=document.elementFromPoint(touch.clientX,touch.clientY);
+      if(!target) return;
+      var targetRow=target.closest(".mrow[data-idx]");
+      if(targetRow&&targetRow!==dragSrc){
+        container.querySelectorAll(".mrow[data-idx]").forEach(function(r){r.classList.remove("drag-over");});
+        targetRow.classList.add("drag-over");
+      }
+    },{passive:false});
+
+    row.addEventListener("touchend",function(e){
+      row.classList.remove("dragging");
+      var over=container.querySelector(".mrow.drag-over");
+      if(over&&over!==dragSrc){
+        over.classList.remove("drag-over");
+        // Scambia posizioni nel DOM
+        var allRows=Array.from(container.querySelectorAll(".mrow[data-idx]"));
+        var iSrc=allRows.indexOf(dragSrc);
+        var iDst=allRows.indexOf(over);
+        if(iSrc<iDst) container.insertBefore(dragSrc,over.nextSibling);
+        else container.insertBefore(dragSrc,over);
+        // Aggiorna autoNext ids dopo riordino
+        refreshAutoNext();
+      }
+      dragSrc=null;
+    },{passive:true});
+
+    // Mouse events per desktop
+    row.addEventListener("dragstart",function(e){dragSrc=row;row.classList.add("dragging");});
+    row.addEventListener("dragend",function(){row.classList.remove("dragging");container.querySelectorAll(".mrow[data-idx]").forEach(function(r){r.classList.remove("drag-over");});dragSrc=null;});
+    row.addEventListener("dragover",function(e){e.preventDefault();if(row!==dragSrc)row.classList.add("drag-over");});
+    row.addEventListener("dragleave",function(){row.classList.remove("drag-over");});
+    row.addEventListener("drop",function(e){
+      e.preventDefault();row.classList.remove("drag-over");
+      if(dragSrc&&dragSrc!==row){
+        var allRows=Array.from(container.querySelectorAll(".mrow[data-idx]"));
+        var iSrc=allRows.indexOf(dragSrc);
+        var iDst=allRows.indexOf(row);
+        if(iSrc<iDst) container.insertBefore(dragSrc,row.nextSibling);
+        else container.insertBefore(dragSrc,row);
+        refreshAutoNext();
+      }
+    });
+  });
 }
 
 function refreshAutoNext(){
@@ -710,9 +760,9 @@ function loadRisForm(){
       var nextC="rg"+i+"t";
       var nextT=i<partite.length-1?"rg"+(i+1)+"c":"";
       var onT=nextT?" oninput=\"autoNext(this,'"+nextT+"')\"":"";
-      html+='<div class="mrow" data-idx="'+i+'">';
+      html+='<div class="mrow" data-idx="'+i+'" draggable="true">';
       html+='<div class="match-row">';
-      html+='<div class="move-btns"><button class="move-btn" onclick="moveRisRow(this,-1)">▲</button><button class="move-btn" onclick="moveRisRow(this,1)">▼</button></div>';
+      html+='<span class="drag-handle">☰</span>';
       html+='<span class="team-name team-home">'+p.casa+'</span>';
       html+='<span class="vsep">vs</span>';
       html+='<span class="team-name team-away">'+p.traf+'</span>';
@@ -738,7 +788,7 @@ function loadRisForm(){
     }
   }
   document.getElementById("rows-ris").innerHTML=html;
-  refreshAutoNext();
+  initDragDrop();
 }
 
 function salvaRis(){

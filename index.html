@@ -126,7 +126,7 @@ var CODES = {"Tizy":"tizy01","Ugo":"ugo02","Beppino":"bep03","Franco":"fra04","M
 var FB_URL = "https://campionato-prono2026-default-rtdb.europe-west1.firebasedatabase.app";
 
 // DB locale (cache sincronizzata con Firebase)
-var DB = {pro:{}, ris:{}, lock:{}, partite39:[]};
+var DB = {pro:{}, ris:{}, lock:{}, partite39:{}, ordine:{}};
 
 // Stato connessione
 var FB_READY = false;
@@ -154,6 +154,7 @@ function fbLoad(){
       DB.ris=data.ris||{};
       DB.lock=data.lock||{};
       DB.partite39=data.partite39||[];
+      DB.ordine=data.ordine||{};
       if(data.codes){
         for(var k in data.codes) CODES[k]=data.codes[k];
       }
@@ -195,6 +196,10 @@ function fbSavePro(g, player, pronos, locked){
 
 function fbSaveRis(g, data){
   fetch(FB_URL+"/ris/"+g+".json",{method:"PUT",body:JSON.stringify(data)});
+}
+
+function fbSaveOrdine(g, ordine){
+  fetch(FB_URL+"/ordine/"+g+".json",{method:"PUT",body:JSON.stringify(ordine)});
 }
 
 function fbSaveLock(g, player, val){
@@ -273,7 +278,7 @@ var BASE = {
   "Mirco":    {pt:35,re:36,v:9, par:4,s:13,gf:187,gs:194,bon:4},
   "Andrea F": {pt:35,re:26,v:9, par:2,s:15,gf:167,gs:190,bon:5},
   "Roberto":  {pt:19,re:22,v:5, par:3,s:18,gf:152,gs:195,bon:1},
-    "Indrid":   {pt:64,re:34,v:17,par:5,s:4, gf:196,gs:143,bon:8},
+  "Indrid":   {pt:64,re:34,v:17,par:5,s:4, gf:196,gs:143,bon:8},
   "Luca":     {pt:56,re:32,v:16,par:2,s:8, gf:199,gs:176,bon:6},
   "Emiliano": {pt:49,re:25,v:15,par:3,s:8, gf:170,gs:149,bon:4},
   "Moka":     {pt:48,re:28,v:13,par:2,s:11,gf:183,gs:171,bon:7},
@@ -351,9 +356,16 @@ function autoNext(el, nextId){
 }
 
 function getPartite(g){
-  if(PARTITE[g]) return PARTITE[g].map(function(p){return{casa:p[0],traf:p[1]};});
-  if(g===39&&DB.partite39&&DB.partite39.length>0) return DB.partite39;
-  return null;
+  var base=null;
+  if(PARTITE[g]) base=PARTITE[g].map(function(p){return{casa:p[0],traf:p[1]};});
+  else if(g===39&&DB.partite39&&DB.partite39.length>0) base=DB.partite39;
+  if(!base) return null;
+  // Applica ordine salvato da admin se presente
+  var ordine=DB.ordine[g];
+  if(ordine&&ordine.length===base.length){
+    return ordine.map(function(idx){return base[idx];});
+  }
+  return base;
 }
 
 function getCalGiornata(g){
@@ -543,16 +555,6 @@ function doLogin(){
   loadPronoForm();
 }
 
-function doLogout(){
-  loggedUser=null;
-  // Cancella login salvato
-  try{localStorage.removeItem("tp_user");localStorage.removeItem("tp_code");}catch(e){}
-  document.getElementById("box-login").style.display="block";
-  document.getElementById("box-prono").style.display="none";
-  document.getElementById("inp-code").value="";
-  document.getElementById("sel-nome").value="";
-}
-
 function tryAutoLogin(){
   try{
     var nome=localStorage.getItem("tp_user");
@@ -726,17 +728,31 @@ function salvaRis(){
   var container=document.getElementById("rows-ris");
   var rows=Array.from(container.querySelectorAll(".mrow"));
   var data=[];
+  var ordine=[];
+  var basePartite=PARTITE[g]?PARTITE[g].map(function(p){return{casa:p[0],traf:p[1]};}):null;
   rows.forEach(function(row){
     var inpC=row.querySelector("input[id$='c']");
     var inpT=row.querySelector("input[id$='t']");
     var nomeCasa=row.querySelector(".team-home");
     var nomeTraf=row.querySelector(".team-away");
     if(nomeCasa&&nomeTraf){
-      data.push({casa:nomeCasa.textContent,traf:nomeTraf.textContent,gC:inpC?inpC.value:"",gT:inpT?inpT.value:""});
+      var casa=nomeCasa.textContent;
+      var traf=nomeTraf.textContent;
+      data.push({casa:casa,traf:traf,gC:inpC?inpC.value:"",gT:inpT?inpT.value:""});
+      // Calcola indice originale per salvare ordine
+      if(basePartite){
+        var origIdx=basePartite.findIndex(function(p){return p.casa===casa&&p.traf===traf;});
+        if(origIdx>=0) ordine.push(origIdx);
+      }
     }
   });
   if(data.length===0){salvaRisLibero();return;}
   fbSaveRis(g, data);
+  // Salva ordine solo se è diverso da quello di default
+  if(basePartite&&ordine.length===basePartite.length){
+    var isDefault=ordine.every(function(v,i){return v===i;});
+    if(!isDefault) fbSaveOrdine(g, ordine);
+  }
   sal("al-ris","Risultati G"+g+" salvati!","aok");
   setTimeout(function(){sal("al-ris","","");},3000);
 }
@@ -823,7 +839,7 @@ function doAdminLogout(){
 }
 
 function adminUnlock(){
-   var p=document.getElementById("sel-ulkp").value;
+  var p=document.getElementById("sel-ulkp").value;
   var g=parseInt(document.getElementById("sel-ulkg").value);
   fbSaveLock(g, p, false);
   sal("al-ulk","Sbloccato "+p+" G"+g,"aok");
@@ -1102,4 +1118,13 @@ window.onload=function(){
 };
 </script>
 </body>
-</html> 
+</html>
+function doLogout(){
+  loggedUser=null;
+  // Cancella login salvato
+  try{localStorage.removeItem("tp_user");localStorage.removeItem("tp_code");}catch(e){}
+  document.getElementById("box-login").style.display="block";
+  document.getElementById("box-prono").style.display="none";
+  document.getElementById("inp-code").value="";
+  document.getElementById("sel-nome").value="";
+}

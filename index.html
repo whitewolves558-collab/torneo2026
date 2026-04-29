@@ -36,6 +36,8 @@ input[type=number]{width:48px;padding:7px 2px;background:rgba(245,197,24,0.1);bo
 .gbar select{margin:0;background:none;border:none;color:#f5c518;font-size:14px;font-weight:800;flex:1;padding:0}
 /* Riga partita pronostici */
 .mrow{background:#1c2539;border-radius:12px;padding:10px 12px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.08)}
+.move-btns{display:flex;flex-direction:column;gap:2px;margin-right:6px;flex-shrink:0}
+.move-btn{background:rgba(255,255,255,0.08);border:none;color:#94a3b8;font-size:11px;padding:3px 7px;border-radius:4px;cursor:pointer}
 .match-row{display:flex;align-items:center;justify-content:space-between;gap:5px}
 .team-name{font-size:12px;font-weight:800;color:#fff;background:rgba(255,255,255,0.07);border-radius:7px;padding:6px 8px;flex:1;text-align:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .team-home{border-left:3px solid #f5c518}
@@ -267,11 +269,11 @@ var BASE = {
   "Christian":{pt:40,re:26,v:12,par:1,s:13,gf:178,gs:171,bon:3},
   "Gigi":     {pt:38,re:23,v:10,par:5,s:11,gf:173,gs:181,bon:3},
   "Beppino":  {pt:37,re:28,v:9, par:5,s:12,gf:186,gs:204,bon:5},
-  "Franco":   {pt:36,re:31,v:10,par:2,s:14,gf:183,gs:191,bon:4}, 
+  "Franco":   {pt:36,re:31,v:10,par:2,s:14,gf:183,gs:191,bon:4},
   "Mirco":    {pt:35,re:36,v:9, par:4,s:13,gf:187,gs:194,bon:4},
-    "Andrea F": {pt:35,re:26,v:9, par:2,s:15,gf:167,gs:190,bon:5},
+  "Andrea F": {pt:35,re:26,v:9, par:2,s:15,gf:167,gs:190,bon:5},
   "Roberto":  {pt:19,re:22,v:5, par:3,s:18,gf:152,gs:195,bon:1},
-  "Indrid":   {pt:64,re:34,v:17,par:5,s:4, gf:196,gs:143,bon:8},
+    "Indrid":   {pt:64,re:34,v:17,par:5,s:4, gf:196,gs:143,bon:8},
   "Luca":     {pt:56,re:32,v:16,par:2,s:8, gf:199,gs:176,bon:6},
   "Emiliano": {pt:49,re:25,v:15,par:3,s:8, gf:170,gs:149,bon:4},
   "Moka":     {pt:48,re:28,v:13,par:2,s:11,gf:183,gs:171,bon:7},
@@ -539,8 +541,8 @@ function doLogin(){
   var g=GA.indexOf(nome)>=0?"A":"B";
   document.getElementById("lbl-user").textContent="Accesso: "+nome+" (Girone "+g+")";
   loadPronoForm();
-  }
- 
+}
+
 function doLogout(){
   loggedUser=null;
   // Cancella login salvato
@@ -666,6 +668,17 @@ function renderTutti(){
 }
 
 // ---- RISULTATI ----
+function moveRisRow(btn, dir){
+  var row=btn.closest(".mrow");
+  var container=document.getElementById("rows-ris");
+  var rows=Array.from(container.querySelectorAll(".mrow"));
+  var idx=rows.indexOf(row);
+  var newIdx=idx+dir;
+  if(newIdx<0||newIdx>=rows.length) return;
+  if(dir===-1) container.insertBefore(row,rows[newIdx]);
+  else container.insertBefore(rows[newIdx],row);
+}
+
 function loadRisForm(){
   var el=document.getElementById("sel-rg");
   if(!el) return;
@@ -680,6 +693,7 @@ function loadRisForm(){
       var nextT=i<partite.length-1?"rg"+(i+1)+"c":"";
       var onT=nextT?" oninput=\"autoNext(this,'"+nextT+"')\"":"";
       html+='<div class="mrow"><div class="match-row">';
+      html+='<div class="move-btns"><button class="move-btn" onclick="moveRisRow(this,-1)">▲</button><button class="move-btn" onclick="moveRisRow(this,1)">▼</button></div>';
       html+='<span class="team-name team-home">'+p.casa+'</span>';
       html+='<span class="vsep">vs</span>';
       html+='<span class="team-name team-away">'+p.traf+'</span>';
@@ -709,11 +723,19 @@ function loadRisForm(){
 
 function salvaRis(){
   var g=parseInt(document.getElementById("sel-rg").value);
-  var partite=getPartite(g);if(!partite)return;
+  var container=document.getElementById("rows-ris");
+  var rows=Array.from(container.querySelectorAll(".mrow"));
   var data=[];
-  for(var i=0;i<partite.length;i++){
-    data.push({casa:partite[i].casa,traf:partite[i].traf,gC:document.getElementById("rg"+i+"c").value||"",gT:document.getElementById("rg"+i+"t").value||""});
-  }
+  rows.forEach(function(row){
+    var inpC=row.querySelector("input[id$='c']");
+    var inpT=row.querySelector("input[id$='t']");
+    var nomeCasa=row.querySelector(".team-home");
+    var nomeTraf=row.querySelector(".team-away");
+    if(nomeCasa&&nomeTraf){
+      data.push({casa:nomeCasa.textContent,traf:nomeTraf.textContent,gC:inpC?inpC.value:"",gT:inpT?inpT.value:""});
+    }
+  });
+  if(data.length===0){salvaRisLibero();return;}
   fbSaveRis(g, data);
   sal("al-ris","Risultati G"+g+" salvati!","aok");
   setTimeout(function(){sal("al-ris","","");},3000);
@@ -801,7 +823,7 @@ function doAdminLogout(){
 }
 
 function adminUnlock(){
-  var p=document.getElementById("sel-ulkp").value;
+   var p=document.getElementById("sel-ulkp").value;
   var g=parseInt(document.getElementById("sel-ulkg").value);
   fbSaveLock(g, p, false);
   sal("al-ulk","Sbloccato "+p+" G"+g,"aok");
@@ -811,7 +833,7 @@ function adminDel(){
   var p=document.getElementById("sel-delp").value;
   var g=parseInt(document.getElementById("sel-delg").value);
   fbDelPro(g, p);
-    sal("al-del","Eliminato "+p+" G"+g,"aok");
+  sal("al-del","Eliminato "+p+" G"+g,"aok");
 }
 
 function renderCodici(){
@@ -1080,4 +1102,4 @@ window.onload=function(){
 };
 </script>
 </body>
-</html>
+</html> 

@@ -355,6 +355,14 @@ function autoNext(el, nextId){
   }
 }
 
+// Torna alla casella precedente con backspace se vuota
+function autoPrev(el, prevId){
+  if(el.value===""&&prevId){
+    var prev=document.getElementById(prevId);
+    if(prev){prev.focus();prev.select();}
+  }
+}
+
 function getPartite(g){
   var base=null;
   if(PARTITE[g]) base=PARTITE[g].map(function(p){return{casa:p[0],traf:p[1]};});
@@ -555,16 +563,6 @@ function doLogin(){
   loadPronoForm();
 }
 
-function doLogout(){
-  loggedUser=null;
-  // Cancella login salvato
-  try{localStorage.removeItem("tp_user");localStorage.removeItem("tp_code");}catch(e){}
-  document.getElementById("box-login").style.display="block";
-  document.getElementById("box-prono").style.display="none";
-  document.getElementById("inp-code").value="";
-  document.getElementById("sel-nome").value="";
-                            }
-  
 function tryAutoLogin(){
   try{
     var nome=localStorage.getItem("tp_user");
@@ -611,9 +609,13 @@ function loadPronoForm(){
     var nextT=i<n-1?"sc"+(i+1)+"c":"";
     var onC=dis?"":" oninput=\"autoNext(this,'"+nextC+"')\"";
     var onT=(!dis&&nextT)?" oninput=\"autoNext(this,'"+nextT+"')\"":"";
-    html+='<input type="number" min="0" max="20" id="sc'+i+'c" value="'+gC+'" placeholder="-" '+dis+onC+'/>';
+    var prevC=i>0?"sc"+(i-1)+"t":"";
+    var prevT="sc"+i+"c";
+    var onkC=dis?"":" onkeydown=\"if(event.key==='Backspace')autoPrev(this,'"+prevC+"')\"";
+    var onkT=dis?"":" onkeydown=\"if(event.key==='Backspace')autoPrev(this,'"+prevT+"')\"";
+    html+='<input type="number" min="0" max="20" id="sc'+i+'c" value="'+gC+'" placeholder="-" '+dis+onC+onkC+'/>';
     html+='<span class="ssep">-</span>';
-    html+='<input type="number" min="0" max="20" id="sc'+i+'t" value="'+gT+'" placeholder="-" '+dis+onT+'/>';
+    html+='<input type="number" min="0" max="20" id="sc'+i+'t" value="'+gT+'" placeholder="-" '+dis+onT+onkT+'/>';
     html+='</div></div></div>';
   }
   cont.innerHTML=html;
@@ -704,15 +706,19 @@ function loadRisForm(){
       var nextC="rg"+i+"t";
       var nextT=i<partite.length-1?"rg"+(i+1)+"c":"";
       var onT=nextT?" oninput=\"autoNext(this,'"+nextT+"')\"":"";
+      var prevC=i>0?"rg"+(i-1)+"t":"";
+      var prevT="rg"+i+"c";
+      var onkT=" onkeydown=\"if(event.key==='Backspace')autoPrev(this,'"+prevT+"')\"";
+      var onkC=" onkeydown=\"if(event.key==='Backspace')autoPrev(this,'"+prevC+"')\"";
       html+='<div class="mrow"><div class="match-row">';
       html+='<div class="move-btns"><button class="move-btn" onclick="moveRisRow(this,-1)">▲</button><button class="move-btn" onclick="moveRisRow(this,1)">▼</button></div>';
       html+='<span class="team-name team-home">'+p.casa+'</span>';
       html+='<span class="vsep">vs</span>';
       html+='<span class="team-name team-away">'+p.traf+'</span>';
       html+='<div class="score-wrap">';
-      html+='<input type="number" min="0" max="20" id="rg'+i+'c" value="'+(sr.gC||"")+'" placeholder="-" oninput="autoNext(this,\''+nextC+'\')" />';
+      html+='<input type="number" min="0" max="20" id="rg'+i+'c" value="'+(sr.gC||"")+'" placeholder="-" oninput="autoNext(this,\''+nextC+'\')"'+onkC+' />';
       html+='<span class="ssep">-</span>';
-      html+='<input type="number" min="0" max="20" id="rg'+i+'t" value="'+(sr.gT||"")+'" placeholder="-"'+onT+'/>';
+      html+='<input type="number" min="0" max="20" id="rg'+i+'t" value="'+(sr.gT||"")+'" placeholder="-"'+onT+onkT+'/>';
       html+='</div></div></div>';
     }
   } else {
@@ -846,8 +852,8 @@ function doAdminLogout(){
   document.getElementById("box-al").style.display="block";
   document.getElementById("box-ap").style.display="none";
   document.getElementById("inp-apwd").value="";
-    }
-  
+}
+
 function adminUnlock(){
   var p=document.getElementById("sel-ulkp").value;
   var g=parseInt(document.getElementById("sel-ulkg").value);
@@ -1129,3 +1135,12 @@ window.onload=function(){
 </script>
 </body>
 </html>
+function doLogout(){
+  loggedUser=null;
+  // Cancella login salvato
+  try{localStorage.removeItem("tp_user");localStorage.removeItem("tp_code");}catch(e){}
+  document.getElementById("box-login").style.display="block";
+  document.getElementById("box-prono").style.display="none";
+  document.getElementById("inp-code").value="";
+  document.getElementById("sel-nome").value="";
+}
